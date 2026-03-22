@@ -1,7 +1,7 @@
 import solver from 'javascript-lp-solver';
 import { OptionData, ArbitrageResult } from '../types';
 
-export function detectArbitrage(options: OptionData[]): ArbitrageResult {
+export function detectArbitrage(options: OptionData[], feeRate: number = 0): ArbitrageResult {
   if (options.length < 3) {
     return { feasible: false, profit: 0, portfolio: [] };
   }
@@ -28,14 +28,14 @@ export function detectArbitrage(options: OptionData[]): ArbitrageResult {
     const isCall = opt.type === 'C';
     
     model.variables[`buy_${i}`] = {
-      profit: -opt.ask,
+      profit: -opt.ask * (1 + feeRate),
       right_slope: isCall ? 1 : 0,
       payoff_0: isCall ? 0 : opt.strike,
       [`buy_${i}_limit`]: 1
     };
     
     model.variables[`sell_${i}`] = {
-      profit: opt.bid,
+      profit: opt.bid * (1 - feeRate),
       right_slope: isCall ? -1 : 0,
       payoff_0: isCall ? 0 : -opt.strike,
       [`sell_${i}_limit`]: 1

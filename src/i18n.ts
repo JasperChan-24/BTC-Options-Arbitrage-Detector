@@ -43,7 +43,8 @@ export const translations = {
     demoModeDesc: "Force arbitrage by modifying selected prices by 30%",
     applyDiscount: "Decrease 30%",
     applyPremium: "Increase 30%",
-    clearDiscounts: "Clear Modifications"
+    clearDiscounts: "Clear Modifications",
+    includeFee: "Include Exchange Fee (0.03%)"
   },
   zh: {
     title: "BTC 期权套利检测器",
@@ -89,7 +90,8 @@ export const translations = {
     demoModeDesc: "强制将选定价格上调或下调30%以创造套利机会",
     applyDiscount: "下调 30%",
     applyPremium: "上调 30%",
-    clearDiscounts: "清除修改"
+    clearDiscounts: "清除修改",
+    includeFee: "包含手续费 (0.03%)"
   }
 };
 

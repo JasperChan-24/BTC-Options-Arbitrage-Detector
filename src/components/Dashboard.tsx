@@ -23,6 +23,9 @@ export default function Dashboard({ lang }: { lang: Language }) {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [selectedPrices, setSelectedPrices] = useState<string[]>([]);
   const [appliedModifications, setAppliedModifications] = useState<Record<string, number>>({});
+  
+  // Fee State
+  const [includeFee, setIncludeFee] = useState(false);
 
   const toggleDemoMode = () => {
     setIsDemoMode(!isDemoMode);
@@ -118,8 +121,8 @@ export default function Dashboard({ lang }: { lang: Language }) {
   }, [filteredOptions]);
 
   const arbResult = useMemo(() => {
-    return detectArbitrage(filteredOptions);
-  }, [filteredOptions]);
+    return detectArbitrage(filteredOptions, includeFee ? 0.0003 : 0);
+  }, [filteredOptions, includeFee]);
 
   // Chart Data
   const convexityData = useMemo(() => {
@@ -204,6 +207,15 @@ export default function Dashboard({ lang }: { lang: Language }) {
         </div>
         <div className="flex items-center gap-4 ml-auto">
           <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+              checked={includeFee}
+              onChange={(e) => setIncludeFee(e.target.checked)}
+            />
+            <span className="text-sm font-medium text-slate-700">{t.includeFee}</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer border-l border-slate-200 pl-4">
             <input 
               type="checkbox" 
               className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
