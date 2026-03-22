@@ -23,7 +23,7 @@ export default function Dashboard({ lang }: { lang: Language }) {
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [selectedPrices, setSelectedPrices] = useState<string[]>([]);
   const [appliedModifications, setAppliedModifications] = useState<Record<string, number>>({});
-  
+
   // Fee State
   const [includeFee, setIncludeFee] = useState(false);
 
@@ -38,7 +38,7 @@ export default function Dashboard({ lang }: { lang: Language }) {
   const togglePriceSelection = (strike: number, type: 'C' | 'P', side: 'bid' | 'ask') => {
     if (!isDemoMode) return;
     const key = `${strike}-${type}-${side}`;
-    setSelectedPrices(prev => 
+    setSelectedPrices(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
   };
@@ -64,18 +64,28 @@ export default function Dashboard({ lang }: { lang: Language }) {
     const data = await fetchDeribitOptions();
     setOptions(data);
     setLastUpdated(new Date());
-    
+
     // Set default expiry to the one with most options if none selected
-    if (!selectedExpiry && data.length > 0) {
-      const expiries = [...new Set(data.map(d => d.expiration))];
-      const counts = expiries.map(exp => ({
-        exp,
-        count: data.filter(d => d.expiration === exp).length
-      }));
-      counts.sort((a, b) => b.count - a.count);
-      setSelectedExpiry(counts[0].exp);
-    }
-    
+    setSelectedExpiry(prev => {
+      if (!prev && data.length > 0) {
+        const validData = data.filter(d => d.volume >= minVolume && d.spread_pct <= maxSpreadPct);
+        const expiries = [...new Set(validData.map(d => d.expiration))];
+        const counts = expiries.map(exp => ({
+          exp,
+          count: validData.filter(d => d.expiration === exp).length
+        }));
+        
+        if (counts.length > 0) {
+          counts.sort((a, b) => b.count - a.count);
+          return counts[0].exp;
+        }
+        
+        // Fallback if no options match filters
+        return data[0]?.expiration || prev;
+      }
+      return prev;
+    });
+
     setLoading(false);
   };
 
@@ -137,11 +147,11 @@ export default function Dashboard({ lang }: { lang: Language }) {
 
   const payoffData = useMemo(() => {
     if (!arbResult.feasible || arbResult.portfolio.length === 0) return [];
-    
+
     const minStrike = filteredOptions[0]?.strike || 0;
     const maxStrike = filteredOptions[filteredOptions.length - 1]?.strike || 100000;
     const step = (maxStrike - minStrike) / 50;
-    
+
     let initialProfit = 0;
     arbResult.portfolio.forEach(pos => {
       if (pos.action === 'buy') {
@@ -177,7 +187,7 @@ export default function Dashboard({ lang }: { lang: Language }) {
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-6 items-end">
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">{t.expirationDate}</label>
-          <select 
+          <select
             className="block w-48 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
             value={selectedExpiry}
             onChange={(e) => setSelectedExpiry(e.target.value)}
@@ -189,8 +199,8 @@ export default function Dashboard({ lang }: { lang: Language }) {
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">{t.minVolume}</label>
-          <input 
-            type="number" 
+          <input
+            type="number"
             className="block w-32 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
             value={minVolume}
             onChange={(e) => setMinVolume(Number(e.target.value))}
@@ -198,8 +208,8 @@ export default function Dashboard({ lang }: { lang: Language }) {
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">{t.maxSpread}</label>
-          <input 
-            type="number" 
+          <input
+            type="number"
             className="block w-32 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
             value={maxSpreadPct}
             onChange={(e) => setMaxSpreadPct(Number(e.target.value))}
@@ -207,8 +217,8 @@ export default function Dashboard({ lang }: { lang: Language }) {
         </div>
         <div className="flex items-center gap-4 ml-auto">
           <label className="flex items-center gap-2 cursor-pointer">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
               checked={includeFee}
               onChange={(e) => setIncludeFee(e.target.checked)}
@@ -216,15 +226,15 @@ export default function Dashboard({ lang }: { lang: Language }) {
             <span className="text-sm font-medium text-slate-700">{t.includeFee}</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer border-l border-slate-200 pl-4">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
               checked={isDemoMode}
               onChange={toggleDemoMode}
             />
             <span className="text-sm font-medium text-slate-700">{t.demoMode}</span>
           </label>
-          <button 
+          <button
             onClick={loadData}
             disabled={loading}
             className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-100 transition-colors disabled:opacity-50"
@@ -320,28 +330,28 @@ export default function Dashboard({ lang }: { lang: Language }) {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={convexityData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis 
-                    dataKey="strike" 
-                    type="number" 
-                    domain={['dataMin', 'dataMax']} 
-                    tickFormatter={(val) => `${val/1000}k`}
+                  <XAxis
+                    dataKey="strike"
+                    type="number"
+                    domain={['dataMin', 'dataMax']}
+                    tickFormatter={(val) => `${val / 1000}k`}
                     stroke="#94a3b8"
                     fontSize={12}
                   />
-                  <YAxis 
-                    stroke="#94a3b8" 
+                  <YAxis
+                    stroke="#94a3b8"
                     fontSize={12}
                     tickFormatter={(val) => `$${val}`}
                   />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
                     labelFormatter={(label) => `${t.strike}: ${label}`}
                   />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                  <Line type="monotone" dataKey="callAsk" stroke="#ef4444" strokeWidth={2} dot={{r: 2}} name={t.callAsk} connectNulls />
-                  <Line type="monotone" dataKey="callBid" stroke="#22c55e" strokeWidth={2} dot={{r: 2}} name={t.callBid} connectNulls />
-                  <Line type="monotone" dataKey="putAsk" stroke="#f97316" strokeWidth={2} dot={{r: 2}} name={t.putAsk} connectNulls />
-                  <Line type="monotone" dataKey="putBid" stroke="#3b82f6" strokeWidth={2} dot={{r: 2}} name={t.putBid} connectNulls />
+                  <Line type="monotone" dataKey="callAsk" stroke="#ef4444" strokeWidth={2} dot={{ r: 2 }} name={t.callAsk} connectNulls />
+                  <Line type="monotone" dataKey="callBid" stroke="#22c55e" strokeWidth={2} dot={{ r: 2 }} name={t.callBid} connectNulls />
+                  <Line type="monotone" dataKey="putAsk" stroke="#f97316" strokeWidth={2} dot={{ r: 2 }} name={t.putAsk} connectNulls />
+                  <Line type="monotone" dataKey="putBid" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} name={t.putBid} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -355,20 +365,20 @@ export default function Dashboard({ lang }: { lang: Language }) {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={payoffData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="underlying" 
-                      type="number" 
+                    <XAxis
+                      dataKey="underlying"
+                      type="number"
                       domain={['dataMin', 'dataMax']}
-                      tickFormatter={(val) => `${val/1000}k`}
+                      tickFormatter={(val) => `${val / 1000}k`}
                       stroke="#94a3b8"
                       fontSize={12}
                     />
-                    <YAxis 
-                      stroke="#94a3b8" 
+                    <YAxis
+                      stroke="#94a3b8"
                       fontSize={12}
                       tickFormatter={(val) => `$${val}`}
                     />
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number) => [`$${value.toFixed(2)}`, t.totalPnl]}
                       labelFormatter={(label) => `${t.btcPrice} $${label}`}
                     />
@@ -418,53 +428,53 @@ export default function Dashboard({ lang }: { lang: Language }) {
                 {strikeRows.map((row) => {
                   const callArbAction = arbResult.portfolio.find(p => p.strike === row.strike && p.type === 'C')?.action;
                   const putArbAction = arbResult.portfolio.find(p => p.strike === row.strike && p.type === 'P')?.action;
-                  
+
                   const getCellClass = (type: 'C' | 'P', side: 'bid' | 'ask', action?: 'buy' | 'sell') => {
                     const key = `${row.strike}-${type}-${side}`;
                     const isSelected = selectedPrices.includes(key);
                     const mod = appliedModifications[key];
-  
+
                     let baseClass = `px-2 py-2 whitespace-nowrap font-mono text-slate-600 transition-colors `;
                     if (isDemoMode) baseClass += 'cursor-pointer hover:bg-indigo-50 ';
-  
+
                     if (isSelected) return baseClass + 'bg-indigo-100 ring-2 ring-inset ring-indigo-500 text-indigo-900 font-bold';
                     if (mod) {
                       if (mod > 1) return baseClass + 'bg-rose-100 text-rose-900 font-bold';
                       return baseClass + 'bg-emerald-100 text-emerald-900 font-bold';
-                   }
-  
+                    }
+
                     // 精确匹配买卖方向
                     const isArbTarget = (action === 'buy' && side === 'ask') || (action === 'sell' && side === 'bid');
                     if (isArbTarget) return baseClass + 'bg-blue-100 text-blue-900 font-bold ring-1 ring-inset ring-blue-500';
-  
+
                     return baseClass;
-                   };
-                  
+                  };
+
                   return (
                     <tr key={row.strike} className="hover:bg-slate-50 border-b border-slate-100">
                       <td className="px-2 py-2 whitespace-nowrap text-right text-slate-500">{row.call?.volume || '-'}</td>
-                      <td 
+                      <td
                         className={`${getCellClass('C', 'bid', callArbAction)} text-right`}
                         onClick={() => row.call && togglePriceSelection(row.strike, 'C', 'bid')}
                       >
                         {row.call ? `$${row.call.bid.toFixed(1)}` : '-'}
                       </td>
-                      <td 
+                      <td
                         className={`${getCellClass('C', 'ask', callArbAction)} text-right`}
                         onClick={() => row.call && togglePriceSelection(row.strike, 'C', 'ask')}
                       >
                         {row.call ? `$${row.call.ask.toFixed(1)}` : '-'}
                       </td>
-                      
+
                       <td className="px-4 py-2 whitespace-nowrap text-center font-bold font-mono text-slate-900 bg-slate-50">{row.strike}</td>
-                      
-                      <td 
+
+                      <td
                         className={`${getCellClass('P', 'bid', putArbAction)} text-left`}
                         onClick={() => row.put && togglePriceSelection(row.strike, 'P', 'bid')}
                       >
                         {row.put ? `$${row.put.bid.toFixed(1)}` : '-'}
                       </td>
-                      <td 
+                      <td
                         className={`${getCellClass('P', 'ask', putArbAction)} text-left`}
                         onClick={() => row.put && togglePriceSelection(row.strike, 'P', 'ask')}
                       >

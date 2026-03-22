@@ -24,16 +24,16 @@ export function detectArbitrage(options: OptionData[], feeRate: number = 0): Arb
   options.forEach((opt, i) => {
     model.constraints[`buy_${i}_limit`] = { max: 1 };
     model.constraints[`sell_${i}_limit`] = { max: 1 };
-    
+
     const isCall = opt.type === 'C';
-    
+
     model.variables[`buy_${i}`] = {
       profit: -opt.ask * (1 + feeRate),
       right_slope: isCall ? 1 : 0,
       payoff_0: isCall ? 0 : opt.strike,
       [`buy_${i}_limit`]: 1
     };
-    
+
     model.variables[`sell_${i}`] = {
       profit: opt.bid * (1 - feeRate),
       right_slope: isCall ? -1 : 0,
@@ -51,13 +51,13 @@ export function detectArbitrage(options: OptionData[], feeRate: number = 0): Arb
   });
 
   const result = solver.Solve(model) as any;
-  
+
   if (result.feasible && result.result > 1e-6) {
     const portfolio = [];
     for (let i = 0; i < options.length; i++) {
       const buyAmt = result[`buy_${i}`] || 0;
       const sellAmt = result[`sell_${i}`] || 0;
-      
+
       if (buyAmt > 1e-6) {
         portfolio.push({
           strike: options[i].strike,
@@ -77,7 +77,7 @@ export function detectArbitrage(options: OptionData[], feeRate: number = 0): Arb
         });
       }
     }
-    
+
     return {
       feasible: true,
       profit: result.result,
