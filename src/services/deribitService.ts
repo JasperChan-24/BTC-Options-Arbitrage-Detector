@@ -44,9 +44,13 @@ export async function fetchDeribitOptions(): Promise<OptionData[]> {
           type,
           bid,
           ask,
-          volume: item.volume,
+          // Deribit volume is in BTC (×100 to match OKX contract unit)
+          volume: (item.volume ?? 0) * 100,
           underlying_price: item.underlying_price,
-          spread_pct
+          spread_pct,
+          exchange: 'deribit' as const,
+          bidSize: item.bid_amount ?? 0,
+          askSize: item.ask_amount ?? 0,
         };
       })
       .filter((opt: OptionData) => opt.bid > 0 && opt.ask > 0);

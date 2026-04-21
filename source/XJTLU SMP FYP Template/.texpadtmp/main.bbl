@@ -1,0 +1,12 @@
+\begin{thebibliography}{1}
+
+\bibitem{bai2021statistical}
+{\sc X.~Bai, X.~Li, N.~Balakrishnan, and M.~He}, {\em Statistical inference for dependent stress--strength reliability of multi-state system using generalized survival signature}, Journal of Computational and Applied Mathematics, 390 (2021), p.~113316.
+
+\bibitem{cox1972regression}
+{\sc D.~R. Cox}, {\em Regression models and life-tables}, Journal of the Royal Statistical Society: Series B (Methodological), 34 (1972), pp.~187--202.
+
+\bibitem{sperr2001survival}
+{\sc W.~Sperr, F.~Wimazal, M.~Kundi, C.~Fonatsch, R.~Thalhammer-Scherrer, G.~Schernthaner, I.~Schwarzinger, O.~Haas, K.~Geissler, K.~Lechner, et~al.}, {\em Survival analysis and aml development in patients with de novo myelodysplastic syndromes: comparison of six different prognostic scoring systems.}, Annals of hematology, 80 (2001).
+
+\end{thebibliography}

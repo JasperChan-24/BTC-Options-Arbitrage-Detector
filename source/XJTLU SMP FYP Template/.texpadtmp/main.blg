@@ -1,0 +1,46 @@
+This is BibTeX, Version 0.99d (TeX Live 2025)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: /Users/renzhao/Library/CloudStorage/SeaDrive-Ren.Zhao(box.xjtlu.edu.cn)/My Libraries/TEACHING/MTH301 FYP/0 - FYP Coordinator/AY2526/10 - Template/XJTLU FYP Template/.texpadtmp/main.aux
+The style file: siam.bst
+Database file #1: ../ref_fyp.bib
+You've used 3 entries,
+            2030 wiz_defined-function locations,
+            521 strings with 4894 characters,
+and the built_in function-call counts, 1310 in all, are:
+= -- 119
+> -- 88
+< -- 0
++ -- 35
+- -- 32
+* -- 112
+:= -- 217
+add.period$ -- 3
+call.type$ -- 3
+change.case$ -- 24
+chr.to.int$ -- 0
+cite$ -- 3
+duplicate$ -- 53
+empty$ -- 69
+format.name$ -- 32
+if$ -- 265
+int.to.chr$ -- 0
+int.to.str$ -- 3
+missing$ -- 3
+newline$ -- 12
+num.names$ -- 6
+pop$ -- 20
+preamble$ -- 1
+purify$ -- 21
+quote$ -- 0
+skip$ -- 50
+stack$ -- 0
+substring$ -- 59
+swap$ -- 26
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 12
+warning$ -- 0
+while$ -- 10
+width$ -- 4
+write$ -- 28

@@ -1,0 +1,855 @@
+\documentclass[openany]{book}
+\linespread{1.5}
+\setlength{\parindent}{0pt}
+\usepackage[a4paper,bindingoffset=0.2in,%
+left=1in,right=1in,top=1in,bottom=1in,%
+footskip=0.25in]{geometry}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{tikz,mathpazo}
+\usetikzlibrary{shapes.geometric, arrows}
+\usepackage{flowchart}
+\usepackage{amssymb}
+\usepackage[UTF8]{ctex}
+\usepackage{hyperref}
+\usepackage{fonttable}
+\usepackage{paralist}
+\usepackage{color,soul}
+\usepackage{bbding}
+\usepackage{floatrow}
+\usepackage{latexsym}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{enumerate}
+\usepackage{multirow}
+\usepackage{hhline}
+\usepackage{fancyhdr}
+\usepackage{textcomp}
+\usepackage{indentfirst}
+\usepackage{pdfpages}
+\usepackage{amsfonts}
+\usepackage{phaistos}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{systeme}
+\usepackage{tcolorbox}
+\usepackage{listings}
+\setcounter{secnumdepth}{1}
+\usepackage[]{tocbibind}
+\numberwithin{figure}{chapter}
+\numberwithin{equation}{chapter}
+
+% Define Theorems
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{corollary}{Corollary}[theorem]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{definition}[theorem]{Definition}
+
+\usepackage[tc]{titlepic}
+
+\pagestyle{fancy}
+\fancyhead[L]{\nouppercase\leftmark}
+\fancyhead[R]{School of Mathematics \& Physics}
+
+\title{\bfseries {\sc{ Real-Time Arbitrage Detection in BTC Options Markets \\ Using Linear Programming and Event-Driven Architecture \\ 基于线性规划与事件驱动架构的BTC期权实时套利检测系统}}}
+\author{ \sc{a thesis}   \\ [5pt]
+\sc{submitted to School of Mathematics \& Physics}\\  [5pt]
+\sc{of Xi'an Jiaotong-Liverpool University}\\ [5pt]
+\sc{in partial fulfilment for the award of the degree of} \\[1.5cm]
+\textsc{\Large{BSc Applied Mathematics}} \\[5pt]
+ By\\[5pt] 
+ \Large{{Yanyu Chen 2257158}}\\ [1cm]
+ Supervisor: Dr. Yun Lu\\ [2cm]
+\titlepic{\includegraphics[width=3cm]{xjtluicon.jpg}}\\
+}
+
+\begin{document}
+
+\clearpage\maketitle
+\thispagestyle{empty}
+\null
+\clearpage
+\newpage
+
+\chapter*{Abstract}
+% English abstract
+\section*{}
+% 【写作指导】摘要简明扼要地涵盖：(1) 研究问题 (2) 方法 (3) 主要发现 (4) 结论。
+% 评分标准注明摘要不计分，但要求中英文双语且正确。
+This thesis investigates the application of Linear Programming (LP) in detecting static arbitrage opportunities within cryptocurrency options markets. Following the framework established by Herzel (2005) for option price no-arbitrage validation via LP duality, we extend the classical formulation by incorporating three real-world constraints: transaction costs, capital budgets, and order book liquidity depth. A production-grade full-stack system is developed, featuring a decoupled Python/FastAPI backend that connects to two major exchanges (OKX and Deribit) via WebSocket, runs the LP solver (SciPy HiGHS), and pushes results to a React frontend via Server-Sent Events (SSE). Empirical results from live market data demonstrate... (Write complete English abstract)
+
+% Chinese version
+\section*{}
+本文研究了线性规划（LP）在加密货币期权市场中检测静态套利机会的应用。基于Herzel (2005) 提出的利用LP对偶性验证期权价格无套利性的理论框架，我们将经典模型扩展为包含交易成本、资金预算和订单簿流动性深度的三重约束形式。本文开发了一套生产级全栈系统，采用解耦的Python/FastAPI后端通过WebSocket连接OKX和Deribit两大交易所，运行LP求解器（SciPy HiGHS），并通过Server-Sent Events（SSE）推送结果至React前端。基于实时市场数据的实证结果表明... (写完整中文摘要)
+
+\vspace{5cm}
+
+\noindent \textbf{KEY WORDS}: Linear Programming, Static Arbitrage, Options Pricing, Convexity Conditions, WebSocket, Event-Driven Architecture, Cryptocurrency Derivatives
+
+\newpage
+
+\chapter*{Acknowledgements}
+
+I would like to express my deepest gratitude to my supervisor, Dr. Yun Lu, for the invaluable guidance... (Write acknowledgements here)
+
+\pagenumbering{roman}
+\tableofcontents
+\listoffigures
+\listoftables
+\newpage
+\pagenumbering{arabic}
+
+% ==================================================
+% Chapter 1: Introduction  (评分标准: Introduction 10%)
+% ==================================================
+\chapter{Introduction}
+% 【评分标准: 10%】
+% 最高分要求: "Engaging introduction, with clear motivation. A clear and logical overview of the project,
+% its objectives, and relevance to the programme. The project is correctly placed in a wider context."
+
+\section{Background: Cryptocurrency Derivatives and Market Structure}
+% 【写作指导】
+% 1. 介绍加密货币衍生品市场的崛起（以BTC期权在Deribit和OKX的发展为例），
+%    引用市场份额数据（如Deribit占全球BTC期权交易量的85%+）。
+% 2. 与传统金融市场（如CBOE期权）对比：加密市场的特殊性——
+%    24/7不间断交易、跨所流动性碎片化（Liquidity Fragmentation）、
+%    BTC结算（Coin-margined）而非USD结算的定价机制。
+% 3. 定义静态套利（Static Arbitrage）——通过一次性构建期权组合、
+%    持有至到期获取无风险利润——强调与动态套利/Delta Hedging的*区别*。
+% 4. 收尾：自然引出"如何用严格数学方法系统性检测此类无风险机会？"
+
+The cryptocurrency derivatives market has experienced rapid growth over the past decade, with Bitcoin (BTC) options emerging as a major asset class. Deribit, founded in 2016, currently dominates the global BTC options market, accounting for over 85\% of the total trading volume \cite{cao2021}. OKX, operated by OKEx, has established itself as the second-largest venue, offering inverse (coin-margined) options contracts settled in BTC rather than fiat currency. The Chicago Board Options Exchange (CBOE) launched Bitcoin futures in December 2017, marking the entry of traditional financial infrastructure into the cryptocurrency derivatives space.\\
+
+Cryptocurrency options markets exhibit several structural characteristics that distinguish them from their traditional counterparts. First, these markets operate continuously (24/7/365), unlike equity options markets which follow fixed trading hours. Second, liquidity is highly fragmented across exchanges: the same underlying asset (BTC) may have options listed on Deribit, OKX, Binance, and other venues, each with independent order books and potentially different pricing. Third, the prevalent use of inverse contracts---where both the premium and the settlement are denominated in BTC rather than USD---introduces additional complexity in pricing and risk management \cite{cao2021}.\\
+
+In this context, we define \textit{static arbitrage} as the construction of a portfolio of options and/or underlying assets at time $t = 0$ such that:
+\begin{enumerate}
+    \item the initial net cost (premium paid minus premium received) is non-positive, and
+    \item the portfolio's payoff at expiration $T$ is non-negative in all states of the world, and strictly positive in at least one state.
+\end{enumerate}
+This is fundamentally different from \textit{dynamic arbitrage} (or delta hedging), which requires continuous rebalancing of the portfolio before expiration and relies on specific assumptions about the stochastic process governing the underlying asset price \cite{merton1973, black1973}. Static arbitrage, by contrast, is model-free: it depends only on the current market prices and the contractual payoff functions, not on any particular pricing model or volatility assumption.\\
+
+A natural question arises: given the fragmented, high-frequency nature of cryptocurrency options markets, how can one systematically and rigorously detect such static arbitrage opportunities across hundreds of listed contracts?
+
+\section{Research Motivation}
+% 【写作指导】
+% 1. 痛点：流动性分散、合约数量庞大（大量行权价×到期日×C/P的笛卡尔积），
+%    人工穷举不现实。
+% 2. 现有工具局限：绝大多数工具基于简单规则（如butterfly spread violation），
+%    缺乏全局最优的数学保证。
+% 3. 引出LP方法的优势：天然在所有约束下寻找利润最大化的最优组合。
+% 4. 与 Herzel (2005) [4] 的联系：该文献建立了LP→无套利的完整对偶关系，
+%    但是假设无交易成本和无限流动性——引出本文需要扩展的方向。
+
+The primary motivation for this project stems from three practical challenges in cryptocurrency options markets.\\
+
+\textbf{Combinatorial explosion of contract space.} At any given time, a single exchange may list hundreds of BTC option contracts spanning multiple expiration dates and strike prices, for both calls and puts. For example, OKX typically lists options across 10--15 expiry dates with 30--50 strike prices each, yielding 600--1500 individual contracts. A potential arbitrage portfolio may involve any subset of these contracts, making manual inspection infeasible.\\
+
+\textbf{Limitations of heuristic approaches.} Existing arbitrage screening tools in cryptocurrency markets typically rely on checking specific structural violations, such as butterfly spread inequalities ($C(K_1) - 2C(K_2) + C(K_3) \geq 0$) or put-call parity deviations \cite{alexander2024}. While these heuristics can identify individual violations, they cannot guarantee that the identified portfolio is \textit{globally optimal}---that is, the most profitable arbitrage among all possible portfolios.\\
+
+\textbf{The gap between theory and execution.} Herzel \cite{herzel2005} established a complete theoretical framework connecting Linear Programming duality with arbitrage detection. Specifically, he proved that a market is free of arbitrage opportunities if and only if the dual LP problem admits a strictly positive solution (Theorem 3.1 in \cite{herzel2005}). However, this classical formulation assumes: (a) no explicit transaction costs beyond bid-ask spreads, (b) unlimited liquidity at quoted prices, and (c) no capital constraints. In real cryptocurrency options markets, these assumptions are violated: exchanges charge explicit taker fees (e.g., 0.03\% on OKX), order book depth at any given price level is often limited to single-digit contracts, and traders operate under finite capital budgets.\\
+
+Linear Programming provides a natural solution to these challenges. By formulating the arbitrage detection problem as an LP, we can simultaneously search over all possible portfolios and guarantee global optimality. Moreover, the LP framework is inherently extensible: additional real-world constraints (transaction costs, liquidity limits, capital budgets) can be incorporated as linear inequalities without altering the fundamental structure of the optimization problem.
+
+\section{Research Objectives}
+% 【写作指导】按3个层次递进：
+% 1. 数学层面：基于Herzel框架，构建包含交易成本、资金预算、订单簿深度的
+%    三重约束LP套利检测模型。
+% 2. 系统层面：设计解耦的客户端-服务器架构（Python后端独立运行 + React前端纯展示），
+%    实现双交易所（OKX + Deribit）并行WebSocket数据引擎和全到期日并行扫描。
+% 3. 工程层面：实现自动IOC下单引擎、订单状态轮询、邮件通知、执行历史持久化存储。
+
+The objectives of this project are structured across three levels of increasing specificity:
+
+\begin{enumerate}
+    \item \textbf{Mathematical modelling.} Extending the classical LP-based arbitrage detection framework of Herzel \cite{herzel2005} by incorporating three real-world constraints: (i) explicit transaction cost modelling with proportional fee rates, (ii) a capital budget constraint reflecting finite trader capital expressed in BTC,  and (iii) order book liquidity depth constraints that bound position sizes by the available volume at top-of-book prices.
+    
+    \item \textbf{System architecture.} Designing a decoupled client-server architecture in which a Python/FastAPI backend operates independently of the browser, connecting to OKX and Deribit exchanges via persistent WebSocket connections. The backend performs LP-based arbitrage scanning across all expiration dates and streams results to a React/TypeScript frontend via Server-Sent Events (SSE).
+    
+    \item \textbf{Automated execution.} Implementing an end-to-end execution pipeline comprising signal deduplication, exchange-specific cooldown periods, contract validity verification, self-trade detection, HMAC-SHA256 signed batch order submission with Immediate-or-Cancel (IOC) semantics, order status polling, email notification, and JSONL-based execution history persistence.
+\end{enumerate}
+
+\section{Report Structure}
+% 【写作指导】简要概述各章内容，形成阅读路线图。
+% 注意：模板要求的标准结构为
+% Introduction → Literature Review → Methodology → Simulation/Data → Discussion → Conclusion
+% 本文结构需在此标准上做适配：
+% Ch1 Introduction → Ch2 Literature Review → Ch3 Methodology (LP建模) →
+% Ch4 System Architecture → Ch5 Results & Evaluation → Ch6 Discussion → Ch7 Conclusion
+
+The remainder of this thesis is organised as follows.
+
+Chapter~2 reviews the relevant literature across four areas: linear programming in financial engineering, arbitrage theory and no-arbitrage pricing, cross-exchange arbitrage in cryptocurrency markets, and high-performance trading system architecture.
+
+Chapter~3 presents the mathematical methodology, beginning with LP foundations (standard form, duality, complementary slackness) and proceeding to the core contribution: the formulation of a triple-constrained LP model for arbitrage detection that extends the Herzel \cite{herzel2005} framework.
+
+Chapter~4 describes the system architecture and implementation, detailing the decoupled client-server design, dual-exchange WebSocket engines, throttled data pipeline, LP solver integration, multi-expiry scanning, and automated execution engine.
+
+Chapter~5 presents the results and evaluation, including LP solver validation with synthetic data, live market monitoring observations, system performance analysis, and execution engine testing.
+
+Chapter~6 discusses the limitations of the model and system, covering market microstructure frictions, model-theoretic boundaries, architectural trade-offs, and directions for future work.
+
+Chapter~7 concludes the thesis by summarising the contributions at the mathematical, system, and engineering levels.
+
+% ==================================================
+% Chapter 2: Literature Review  (评分标准: Background 10%)
+% ==================================================
+\chapter{Literature Review}
+% 【评分标准: 10%】
+% 最高分要求: "Fully comprehensive background review, with technical analysis and critical insights
+% on an appropriate level. Leads easily into the rest of the project. Strongly aligned with the project objectives."
+%
+% 【总体提醒】每节需综合多篇文献并进行批判性分析（Critical Synthesis），而非逐篇罗列。
+% 评分标准特别看重是否 "leads easily into the rest of the project"，
+% 所以每节末尾都应说明该文献主题如何与本项目的具体工作相关联。
+
+\section{Linear Programming in Financial Engineering}
+% 【写作指导】
+% 1. LP在金融中的演进：Dantzig (1947) [6] → Markowitz (1952) [7] 投资组合优化 →
+%    Sharpe (1967) [9] → Antonelli et al. (1999) [8] LP确定期权价格区间。
+% 2. Cornuejols \& Tütüncü (2006) [17] 教材中LP在金融中的系统性介绍。
+% 3. 批判性分析：传统LP模型假设连续变量和完美流动性，不适用于加密市场稀薄订单簿——
+%    →引出本文在LP约束中加入流动性深度限制的创新。
+% 注意：可直接引用你interim report中Section 2.1的内容和文献编号。
+
+Linear Programming (LP) is a cornerstone of mathematical optimisation, seeking to maximise or minimise a linear objective function subject to linear equality and inequality constraints. The LP standard form is given by:
+$$\min_{\mathbf{x}} \; \mathbf{c}^T\mathbf{x} \quad \text{s.t.} \quad A\mathbf{x} = \mathbf{b}, \; \mathbf{x} \geq \mathbf{0},$$
+where $A \in \mathbb{R}^{m \times n}$, $\mathbf{b} \in \mathbb{R}^m$, $\mathbf{c} \in \mathbb{R}^n$, and $\mathbf{x} \in \mathbb{R}^n$ is the vector of decision variables. The Simplex Method, introduced by Dantzig in 1947 \cite{dantzig1947}, remains a foundational algorithm for solving LP problems efficiently by traversing vertices of the feasible polytope.\\
+
+In finance, LP has been applied across several domains. Markowitz's \cite{markowitz1952} seminal work on mean-variance portfolio optimisation, while originally formulated as a quadratic program, can be linearised under certain risk measures (e.g., minimising maximum deviation). Sharpe \cite{sharpe1967} developed an LP-based algorithm for mutual fund portfolio selection that significantly reduced computational requirements compared to the full quadratic formulation.\\
+
+The application of LP to derivatives pricing represents a particularly relevant line of research. Antonelli et al. \cite{antonelli1999} utilised LP to compute arbitrage bounds for American options in discrete and incomplete market settings, establishing upper and lower price bounds that are consistent with the absence of arbitrage. Bertsimas and Popescu \cite{bertsimas2002} provided a convex optimisation approach to establishing the tightest possible bounds on option prices given a set of known market prices, demonstrating that LP duality produces price bounds whose dual variables correspond to risk-neutral probabilities. Cornu\'{e}jols and T\"{u}t\"{u}nc\"{u} \cite{cornuejols2006} provide a comprehensive treatment of optimisation methods in finance, including LP, quadratic programming, and conic optimisation, systematically demonstrating how each problem class maps to specific financial applications.\\
+
+A critical observation relevant to this project is that classical LP formulations in financial engineering typically assume \textit{continuous decision variables} and \textit{perfect liquidity}---that is, any fractional quantity of any security can be traded at the quoted price. In cryptocurrency options markets, however, liquidity at any given price level is often limited to single-digit contracts, and the bid-ask spread can exceed 10\% for illiquid strikes \cite{goyenko2009}. This motivates the introduction of explicit liquidity depth constraints into the LP framework, which is one of the key contributions of the present work.
+
+\section{Arbitrage Theory and No-Arbitrage Pricing}
+% 【写作指导】
+% 1. 资产定价基本定理（FTAP）：Delbaen \& Schachermayer (1994) [12]：
+%    无套利 ⟺ 存在等价鞅测度。
+% 2. 期权价格必须满足的静态无套利条件（可直接引用你interim report Section 2.2的内容）：
+%    - Kuhn (2008) [13] strict no-arbitrage with transaction costs
+%    - Socolovsky (2013) [14] Geometric Arbitrage Theory (GAT)
+% 3. **重点引用 Herzel (2005) [4]**——本项目的理论基础：
+%    - 建立了LP Primal/Dual与套利类型A/B的完整等价关系 (Theorem 3.1)
+%    - 证明了Call价格无套利 ⟺ C(K) 严格递减、严格凸、严格正 (Theorem 4.1)
+%    - Bid-Ask Spread情况下的LP扩展 (Section 5)
+%    批判性分析：Herzel模型假设(a)订单簿深度无限 (b)交易成本仅表现为bid-ask差异
+%    而非显式手续费 → 本文的三重约束LP是对此的直接扩展。
+
+The theoretical foundation for arbitrage detection in financial markets rests upon the Fundamental Theorem of Asset Pricing (FTAP). In its most general form, established by Delbaen and Schachermayer \cite{delbaen1994}, the FTAP states that a market is free of arbitrage opportunities if and only if there exists an equivalent martingale measure---a probability measure under which discounted asset prices are martingales. This result provides the theoretical justification for pricing by replication and establishes the deep connection between no-arbitrage conditions and the existence of state prices.\\
+
+Merton \cite{merton1973} derived several necessary conditions for rational option pricing, including the fundamental result that the price of a European call option must be a convex function of its exercise price (Theorem 4 in \cite{merton1973}). This convexity condition can be expressed as the \textit{butterfly spread inequality}: for strike prices $K_1 < K_2 < K_3$,
+\begin{equation}
+C(K_2) \leq \frac{K_3 - K_2}{K_3 - K_1} C(K_1) + \frac{K_2 - K_1}{K_3 - K_1} C(K_3),
+\label{eq:butterfly}
+\end{equation}
+where $C(K)$ denotes the price of a call option with strike $K$. Violation of this inequality implies the existence of a butterfly spread arbitrage.\\
+
+In markets with transaction costs, the no-arbitrage condition must be appropriately modified. Constantinides \cite{constantinides1986} and Kuhn and Molitor \cite{kuhn2008} introduced the concept of \textit{strict no-arbitrage} in discrete markets with proportional transaction costs, defining a consistent price system that accounts for the friction between bid and ask prices.\\
+
+\textbf{The Herzel (2005) LP framework.} The work most directly relevant to this project is the LP-based arbitrage detection framework developed by Herzel \cite{herzel2005}. Building upon Proposition 3.1 in \cite{herzel2005}, which states that a portfolio payoff $\Psi_{\mathbf{x}}(S_T)$ is non-negative for all $S_T \in [0, \infty)$ if and only if it is non-negative at each breakpoint (strike price) and satisfies a right-slope condition, Herzel formulates the arbitrage detection problem as a linear program:
+\begin{equation}
+\min_{\mathbf{x}} \; \mathbf{c}'\mathbf{x} \quad \text{s.t.} \quad L\mathbf{x} \geq \mathbf{0},
+\label{eq:herzel_primal}
+\end{equation}
+where $\mathbf{c}$ is the vector of security prices and $L$ is the payoff matrix evaluated at the breakpoints. The corresponding dual problem is:
+\begin{equation}
+\max_{\mathbf{y}} \; \mathbf{0}'\mathbf{y} \quad \text{s.t.} \quad L'\mathbf{y} = \mathbf{c}, \; \mathbf{y} \geq \mathbf{0}.
+\label{eq:herzel_dual}
+\end{equation}
+
+Herzel proves two fundamental results. First, the dual problem (\ref{eq:herzel_dual}) is feasible if and only if there is no type B arbitrage (Lemma 3.1). Second, if there are no type B arbitrages, then there are no type A arbitrages if and only if the dual problem admits a strictly positive solution (Lemma 3.2). These are combined in Theorem 3.1: \textit{there are no arbitrage opportunities if and only if the dual problem has a strictly positive solution}. For European call options specifically, Theorem 4.1 provides a clean characterisation: the absence of arbitrage is equivalent to the price function $C(K)$ being strictly decreasing, strictly convex, and strictly positive.\\
+
+Herzel also extends the framework to the case of bid-ask spreads (Section 5 of \cite{herzel2005}), splitting each security into a ``bid security'' (which can only be sold) and an ``ask security'' (which can only be bought), with separate price vectors $\mathbf{c}_a$ and $\mathbf{c}_b$. This structural decomposition is directly adopted in the present work, where we assign two decision variables per contract: one for buying (at the ask price) and one for selling (at the bid price).\\
+
+\textbf{Critical assessment.} While Herzel's framework provides rigorous theoretical foundations, two key assumptions limit its direct applicability to real-world cryptocurrency options trading: (i) it models transaction costs solely through the bid-ask spread, without accounting for explicit exchange fees (taker fees on OKX and Deribit are 0.03\% and 0.04\% of the underlying, respectively), and (ii) it assumes unlimited liquidity at quoted prices, meaning any quantity can be traded at the current bid or ask. The extended triple-constrained LP model developed in Chapter~3 of this thesis directly addresses both limitations.
+
+\section{Arbitrage in Cryptocurrency Markets}
+% 【写作指导】
+% 1. 加密货币跨所套利文献：Makarov \& Schoar (2020) 比特币现货跨所套利研究。
+% 2. 现货套利 vs 衍生品套利的差异：期权涉及多条腿（multi-leg）且受订单簿深度限制。
+% 3. 指出学术空白：现有跨所套利研究集中在现货/永续合约，
+%    对期权（尤其是LP方法在加密期权中的应用）的系统研究极少。
+% 4. →引出本项目填补的空白：将Herzel的经典LP框架应用于加密货币期权实时检测。
+
+The empirical study of arbitrage in cryptocurrency markets has attracted significant academic attention. Most existing research focuses on \textit{cross-exchange spot arbitrage}---exploiting price differences for the same asset across different trading venues. Makarov and Schoar \cite{makarov2020} provided a comprehensive analysis of Bitcoin price differences across exchanges, documenting large, recurring arbitrage opportunities with cross-country price deviations of 10--25\% during periods of rapid price appreciation. They attributed these persistent mispricings to capital controls and regulatory barriers that impede the flow of arbitrage capital across jurisdictions.\\
+
+However, the type of arbitrage studied in cross-exchange literature is structurally simple: buy BTC on exchange A at price $p_A$ and sell simultaneously on exchange B at price $p_B > p_A$. This is a single-leg strategy. \textit{Intra-exchange options arbitrage}---the focus of the present project---is fundamentally different. Here, mispricing arises not from the same asset being priced differently across venues, but from \textit{inconsistencies among the prices of different option contracts listed on the same exchange}. These inconsistencies violate the no-arbitrage convexity conditions established by Merton \cite{merton1973} and Herzel \cite{herzel2005}. Detecting such violations requires examining multi-leg portfolios potentially involving dozens of contracts across different strikes and types (calls and puts), which is precisely the role of the LP formulation.\\
+
+In the cryptocurrency derivatives space specifically, Alexander et al. \cite{alexander2024} provided the first systematic study of efficiency tests for crypto options. They introduced a ``fiat-currency-free'' put-call parity relationship for inverse (coin-margined) options on Deribit, and developed arbitrage tests for both options-only and cross-market (options + perpetual futures) strategies. Their findings indicate that Bitcoin derivative markets are becoming more efficient, particularly for maturities beyond 15 days, though profitable arbitrage strategies remain viable after accounting for transaction costs. Cao and Celik \cite{cao2021} contributed to this area by developing a valuation framework for Bitcoin options that treats Bitcoin as a foreign currency in a small open economy.\\
+
+\textbf{Identification of the research gap.} Despite this growing literature, a notable gap remains: there are no published studies applying LP-based global optimisation methods to detect \textit{intra-exchange static arbitrage} in cryptocurrency options markets. Existing approaches either rely on specific structural tests (butterfly spreads, put-call parity) or focus exclusively on cross-exchange spot/futures arbitrage. The present project addresses this gap by implementing the Herzel \cite{herzel2005} LP framework---extended with real-world constraints---as a real-time detection and execution system for BTC options. The system monitors OKX and Deribit independently, scanning each exchange's option chain for internal pricing inconsistencies. Cross-exchange arbitrage (jointly optimising across both exchanges' order books in a unified LP) is identified as a natural direction for future work in Chapter~6.
+
+\section{High-Performance Trading System Architecture}
+% 【写作指导】
+% 1. HFT系统设计文献：延迟指标、订单簿异步（Order Book Asynchrony）、执行风险。
+% 2. 事件驱动架构 vs 轮询架构：WebSocket推送 vs REST轮询。
+% 3. 批判性分析：学术文献中的低延迟方案多针对传统金融（FIX协议、内核旁路），
+%    加密货币市场有其独特的API限制和地理延迟问题——
+%    →引出本文的节流（Throttling）、数据过期看门狗（Staleness Watchdog）设计。
+
+The design and implementation of low-latency trading systems has been extensively studied in the context of traditional financial markets. Aldridge \cite{aldridge2013} provides a comprehensive treatment of high-frequency trading (HFT) strategies and system architecture, emphasising the critical role of latency minimisation in capturing fleeting arbitrage opportunities. Narang \cite{narang2013} offers a complementary perspective on quantitative and high-frequency trading from the practitioner's viewpoint, discussing the practical challenges of system implementation. Hasbrouck and Saar \cite{hasbrouck2013} empirically analyse low-latency trading in equity markets, demonstrating that the latency of market data arrival and order submission directly impacts the profitability of latency-sensitive strategies.\\
+
+A key architectural decision in trading system design is the choice between \textit{polling} and \textit{event-driven} data ingestion. In a polling architecture, the system periodically queries the exchange via REST API calls at fixed intervals (e.g., every 500ms). In an event-driven architecture, the exchange pushes updates to the system via persistent WebSocket connections as soon as new data becomes available. The event-driven approach offers significantly lower latency and reduced bandwidth consumption, as the system processes only data that has actually changed \cite{aldridge2013}.\\
+
+\textbf{Cryptocurrency-specific considerations.} The HFT literature primarily addresses traditional financial markets, where infrastructure such as the FIX protocol, kernel bypass networking, and co-location services are standard. Cryptocurrency exchanges operate under different constraints: (i) API rate limits restrict the number of REST requests per second (e.g., OKX imposes 20 requests/2 seconds per endpoint), (ii) geographic dispersion of exchange servers (OKX: AWS Singapore/Tokyo; Deribit: AWS London) introduces non-negligible network latency for non-co-located systems, and (iii) WebSocket connections may silently fail---maintaining a TCP connection while ceasing to deliver application-level data---necessitating application-level liveness detection mechanisms.\\
+
+These constraints motivate several design decisions in the present system, including the use of a \textit{throttled data pipeline} that decouples high-frequency WebSocket message arrival from the computationally expensive LP solving step, and a \textit{staleness watchdog} that detects and recovers from zombie WebSocket connections. These mechanisms are detailed in Chapter~4.
+
+% ==================================================
+% Chapter 3: Methodology  (评分标准: Scope/Depth 10% + Rigor 10% + Own Contribution 20%)
+% ==================================================
+\chapter{Methodology}
+% 【评分标准: Scope/Depth 10% + Rigor/Correctness 10%，以及 Own Contribution 20% 的核心部分】
+% 最高分要求: "Arguments and/or proofs are written down in a rigorous way...demonstrates deep understanding."
+% "Correctly uses a wide variety of concepts and ideas to discuss and thoroughly understand the given topic."
+%
+% 【总体策略】
+% 本章可分为两部分：
+%   Part I (3.1-3.3)：LP基础理论——可大量复用/引用你 interim report 中 Chapter 3 的内容。
+%   Part II (3.4-3.5)：套利检测LP建模——结合 Herzel [4] 的理论框架 + 你自己的三重约束扩展。
+% 这样既展示数学深度（评分标准要求），又体现 "Own Contribution"（将理论扩展为实用模型）。
+
+This chapter presents the mathematical methodology underlying the arbitrage detection system. Section~3.1 reviews the essential LP theory, including standard form, duality, and complementary slackness. Section~3.2 then develops the LP formulation for arbitrage detection, beginning with the classical framework of Herzel \cite{herzel2005} and extending it with three practical constraints. Section~3.3 discusses the choice of LP solver.
+
+% ─── Part I: LP Foundations (可引用 interim report Chapter 3) ─────────────
+
+\section{Linear Programming Foundations}
+% 【写作指导】
+% 此节可直接复用/改写 interim report Section 3.1 "The Linear Programming Problem" 的内容。
+% 给出 Definition (Feasible Solution, Optimal Solution) 和 LP标准形式。
+% 注意引用 [16] Bazaraa et al.
+
+We begin by reviewing the core concepts and results of linear programming that are essential for the arbitrage detection model. The exposition follows Bazaraa et al. \cite{bazaraa2006} and Bertsimas and Tsitsiklis \cite{bertsimas1997}.
+
+\subsection{Standard Form and Geometric Interpretation}
+% 【写作指导】
+% 1. LP标准形式：$\min \; \mathbf{c}^T\mathbf{x} \;\;\text{s.t.}\;\; A\mathbf{x} = \mathbf{b},\; \mathbf{x} \ge \mathbf{0}$
+% 2. 几何解释：可行域为凸多面体，最优解在极点（Vertex）。
+% 3. Simplex方法简述（可引用 interim report Section 3.4-3.5 中的内容）。
+% 4. 简要提及HiGHS求解器使用的对偶单纯形 + 内点法混合策略。
+
+\begin{definition}[Feasible Solution {\cite{bazaraa2006}}]
+A vector $\mathbf{x} \in \mathbb{R}^n$ that satisfies all constraints of a linear programming problem is called a \textit{feasible solution}. The set of all feasible solutions forms the \textit{feasible region}.
+\end{definition}
+
+\begin{definition}[Optimal Solution {\cite{bazaraa2006}}]
+A feasible solution $\mathbf{x}^*$ that achieves the best possible value of the objective function (minimum for minimisation problems) is called an \textit{optimal solution}.
+\end{definition}
+
+The general form of a linear programming problem can be expressed as:
+\begin{equation}
+\min_{\mathbf{x}} \; \mathbf{c}^T\mathbf{x} \quad \text{subject to} \quad 
+\begin{cases}
+\mathbf{a}_i^T \mathbf{x} = b_i, & i \in E, \\
+\mathbf{a}_i^T \mathbf{x} \geq b_i, & i \in I,
+\end{cases}
+\label{eq:lp_general}
+\end{equation}
+where $E$ and $I$ represent the index sets for equality and inequality constraints, respectively. The vector $\mathbf{c} \in \mathbb{R}^n$ defines the objective function, $\mathbf{x} \in \mathbb{R}^n$ is the vector of decision variables, and $\mathbf{a}_i \in \mathbb{R}^n$, $b_i \in \mathbb{R}$ define the constraint parameters.\\
+
+For algorithmic purposes, it is convenient to transform any LP problem into \textit{standard form}:
+\begin{equation}
+\min_{\mathbf{x}} \; \mathbf{c}^T\mathbf{x} \quad \text{subject to} \quad A\mathbf{x} = \mathbf{b}, \; \mathbf{x} \geq \mathbf{0},
+\label{eq:lp_standard}
+\end{equation}
+where $A \in \mathbb{R}^{m \times n}$ is the constraint matrix and $\mathbf{b} \in \mathbb{R}^{m}$. This conversion is achieved by introducing non-negative \textit{slack variables} to transform each inequality constraint into an equation. Geometrically, the feasible region of an LP in standard form is a \textit{convex polytope}, and the fundamental theorem of linear programming states that if an optimal solution exists, it occurs at a vertex (extreme point) of this polytope \cite{bertsimas1997}.\\
+
+The \textit{Simplex Method}, introduced by Dantzig \cite{dantzig1947}, exploits this vertex optimality property by moving along edges of the polytope from one vertex to an adjacent vertex with a better objective value. While the simplex method has exponential worst-case complexity, it performs extremely well in practice. Modern LP solvers, such as HiGHS \cite{huangfu2018}, employ a combination of the dual simplex method and interior-point methods (IPMs) to achieve robust and efficient performance on large-scale problems. Interior-point methods, unlike the simplex method, traverse the interior of the polytope and converge in polynomial time.
+
+\subsection{Duality Theory}
+% 【写作指导】
+% 可直接复用 interim report Section 3.2 "Duality" 的内容，包括：
+% - Weak Duality Theorem (Theorem 3.2.1 in interim) 及其证明
+% - Strong Duality Theorem (Theorem 3.2.2)
+% - 经济学解释：对偶变量 → 状态价格 → 风险中性概率测度
+% 注意引用 [17] Cornuejols \& Tütüncü
+
+Duality is a central concept in linear programming that provides both theoretical insights and computational advantages. For every LP (called the \textit{primal problem}), there exists a corresponding \textit{dual problem} that offers alternative perspectives on the same optimisation.\\
+
+Consider the standard-form primal problem (\ref{eq:lp_standard}). The corresponding dual problem is:
+\begin{equation}
+\max_{\mathbf{y}} \; \mathbf{b}^T\mathbf{y} \quad \text{subject to} \quad A^T\mathbf{y} \leq \mathbf{c},
+\label{eq:lp_dual}
+\end{equation}
+where $\mathbf{y} \in \mathbb{R}^m$ is the dual variable vector.
+
+\begin{theorem}[Weak Duality {\cite{bazaraa2006}}]
+\label{thm:weak_duality}
+For any feasible solution $\mathbf{x}$ to the primal problem and any feasible solution $\mathbf{y}$ to the dual problem:
+$$\mathbf{c}^T\mathbf{x} \geq \mathbf{b}^T\mathbf{y}.$$
+\end{theorem}
+
+\begin{proof}
+Since $\mathbf{x} \geq \mathbf{0}$ and $A^T\mathbf{y} \leq \mathbf{c}$, we have $\mathbf{y}^T A \leq \mathbf{c}^T$. Multiplying both sides by $\mathbf{x} \geq \mathbf{0}$ yields $\mathbf{y}^T A\mathbf{x} \leq \mathbf{c}^T\mathbf{x}$. Since $A\mathbf{x} = \mathbf{b}$, we obtain $\mathbf{b}^T\mathbf{y} \leq \mathbf{c}^T\mathbf{x}$.
+\end{proof}
+
+An immediate consequence is that if the primal problem is unbounded, then the dual problem must be infeasible, and vice versa \cite{bazaraa2006}.
+
+\begin{theorem}[Strong Duality {\cite{cornuejols2006}}]
+\label{thm:strong_duality}
+If both the primal and dual problems have feasible solutions, then they both attain their optimal values, and these values are equal:
+$$\min_{\mathbf{x}} \; \mathbf{c}^T\mathbf{x} = \max_{\mathbf{y}} \; \mathbf{b}^T\mathbf{y}.$$
+\end{theorem}
+
+The economic interpretation of duality is particularly relevant for arbitrage detection. In the context of option pricing, the dual variables $\mathbf{y}$ can be interpreted as \textit{Arrow-Debreu state prices} (or risk-neutral probabilities) associated with each possible state of the world at expiration \cite{cornuejols2006}. When the dual problem is infeasible---meaning no positive state price vector exists that is consistent with the observed market prices---the strong duality theorem implies that the primal objective is unbounded from below, signifying the existence of a riskless arbitrage opportunity. This is precisely the LP-based characterisation of arbitrage established by Herzel \cite{herzel2005}.
+
+\subsection{Complementary Slackness}
+% 【写作指导】
+% 可引用 interim report Section 3.3 的内容。
+% 强调：互补松弛条件在套利检测中的意义——
+% 如果某个约束（如某个行权价处的收益非负条件）有严格正松弛量，
+% 说明该节点不是"紧约束"，即组合在该点有多余的安全边际。
+
+The complementary slackness conditions provide a necessary and sufficient criterion for the simultaneous optimality of primal and dual solutions.
+
+\begin{theorem}[Complementary Slackness {\cite{bertsimas1997}}]
+\label{thm:comp_slack}
+A primal feasible solution $\mathbf{x}^*$ and a dual feasible solution $\mathbf{y}^*$ are simultaneously optimal if and only if:
+\begin{enumerate}
+    \item For each $j$: if $x_j^* > 0$, then the $j$-th dual constraint is tight: $\mathbf{a}_j^T \mathbf{y}^* = c_j$.
+    \item For each $i$: if $y_i^* > 0$, then the $i$-th primal constraint is tight: $\mathbf{a}_i^T \mathbf{x}^* = b_i$.
+\end{enumerate}
+\end{theorem}
+
+In the context of arbitrage detection, complementary slackness yields useful economic interpretations. Suppose the LP identifies an optimal arbitrage portfolio $\mathbf{x}^*$. For each payoff constraint (corresponding to a breakpoint $K_j$), a strictly positive slack variable indicates that the portfolio has a \textit{safety margin} at that strike price---the portfolio's payoff at $S_T = K_j$ strictly exceeds zero, even though the constraint only requires non-negativity. Conversely, a zero slack (binding constraint) identifies the critical states of the world at which the arbitrage portfolio provides exactly zero payoff, representing the ``tightest'' points of the hedging strategy.
+
+% ─── Part II: Arbitrage Detection LP Formulation ─────────────────────────
+
+\section{LP Formulation for Arbitrage Detection}
+% 【写作指导】
+% 这是全文核心。先介绍 Herzel [4] 的经典框架，再展示你的扩展。
+
+This section develops the LP formulation for detecting static arbitrage opportunities in BTC options markets. We begin by establishing the mathematical prerequisites (payoff functions and no-arbitrage conditions), then review the classical Herzel \cite{herzel2005} framework, and finally present the extended triple-constrained model that forms the core mathematical contribution of this thesis.
+
+\subsection{Options Payoff and No-Arbitrage Conditions}
+% 【写作指导】
+% 1. 定义看涨/看跌期权的到期收益函数：
+%    $\Psi_{\text{Call}}(S_T) = \max(S_T - K, 0)$, $\Psi_{\text{Put}}(S_T) = \max(K - S_T, 0)$
+% 2. 引用 Herzel [4] Proposition 3.1：组合的到期收益在 $[0, \infty)$ 上非负，
+%    当且仅当它在 $S_T = 0$、每个行权价 $K_j$、以及右侧渐近处均非负。
+% 3. 引用 Herzel [4] Theorem 4.1：对于仅有Call的情况，
+%    无套利 ⟺ $C(K)$ 严格递减、严格凸、严格正。
+% 4. 引用 Herzel [4] Theorem 3.1 (LP版本)：
+%    无套利 ⟺ 对偶问题存在严格正解。
+%    经济学解释：对偶变量 $y$ 对应状态价格 / Arrow-Debreu 价格。
+
+Consider $n$ European option contracts written on the same underlying asset (BTC) with the same expiration date $T$. Each contract $i$ ($i = 0, 1, \ldots, n-1$) is either a call or a put with strike price $K_i$. The payoff of contract $i$ at expiration, when the underlying price is $S_T$, is:
+\begin{equation}
+\Psi_i(S_T) = \begin{cases}
+\max(S_T - K_i, 0), & \text{if contract } i \text{ is a call}, \\
+\max(K_i - S_T, 0), & \text{if contract } i \text{ is a put}.
+\end{cases}
+\label{eq:payoff}
+\end{equation}
+
+Given a portfolio $\mathbf{x} = (x_1, \ldots, x_N)^T$ of these contracts, the total payoff at expiration is $\Psi_{\mathbf{x}}(S_T) = \sum_{i=1}^{N} x_i \Psi_i(S_T)$, which is a piecewise linear function of $S_T$, with breakpoints at the strike prices $K_1 < K_2 < \cdots < K_N$.
+
+\begin{proposition}[Payoff Non-Negativity {\cite{herzel2005}, Proposition 3.1}]
+\label{prop:payoff_nonneg}
+The portfolio payoff $\Psi_{\mathbf{x}}(S_T) \geq 0$ for all $S_T \in [0, \infty)$ if and only if:
+\begin{enumerate}
+    \item $\Psi_{\mathbf{x}}(0) \geq 0$,
+    \item $\Psi_{\mathbf{x}}(K_j) \geq 0$ for each strike price $K_j$, $j = 1, \ldots, N$,
+    \item $\Psi_{\mathbf{x}}(K_N + 1) \geq \Psi_{\mathbf{x}}(K_N)$ \;\; (the right-slope condition).
+\end{enumerate}
+\end{proposition}
+
+This proposition is crucial because it reduces the verification of a continuum of conditions (non-negativity for all $S_T \geq 0$) to a \textit{finite} set of linear inequalities, making the problem tractable for LP.
+
+\begin{theorem}[No-Arbitrage Characterisation {\cite{herzel2005}, Theorem 3.1}]
+\label{thm:herzel_main}
+There are no arbitrage opportunities if and only if the dual LP problem (\ref{eq:herzel_dual}) has a strictly positive solution.
+\end{theorem}
+
+For the special case of European call options, Herzel provides a particularly clean characterisation:
+
+\begin{theorem}[Call Price Convexity {\cite{herzel2005}, Theorem 4.1}]
+\label{thm:call_convexity}
+Let $K_1 < K_2 < \cdots < K_N$ be the strike prices of European call options with the same underlying and maturity. There are no arbitrage opportunities if and only if the price function $C(K)$ is strictly decreasing, strictly convex, and strictly positive on $\{K_1, \ldots, K_N\}$.
+\end{theorem}
+
+The economic interpretation of Theorem~\ref{thm:herzel_main} connects LP duality to asset pricing theory: the strictly positive dual variables $\mathbf{y}$ correspond to Arrow-Debreu state prices, which can be interpreted as a discrete risk-neutral probability measure consistent with the observed market prices.
+
+\subsection{Classical LP Formulation (Herzel Framework)}
+% 【写作指导】
+% 严格按照 Herzel [4] Section 3 呈现经典LP模型：
+%   Primal: $\min_{\mathbf{x}} \; \mathbf{c}'\mathbf{x} \;\;\text{s.t.}\;\; L\mathbf{x} \ge \mathbf{0}$
+%   Dual:   $\max_{\mathbf{y}} \; \mathbf{0}'\mathbf{y} \;\;\text{s.t.}\;\; L'\mathbf{y} = \mathbf{c}, \; \mathbf{y} \ge \mathbf{0}$
+% 其中 $L$ 是到期收益矩阵（payoff matrix），$\mathbf{c}$ 是价格向量。
+%
+% 引用 Lemma 3.1, 3.2：
+%   - Dual 可行 ⟺ 不存在 B类套利
+%   - Dual 有严格正解 ⟺ 不存在 A类套利
+%
+% 引用 Section 5 (bid-ask spreads)：
+%   Herzel 将每个合约拆分为 'bid security'（只能卖）和 'ask security'（只能买）。
+%   这与本项目代码中 $x_{2i}$=buy 和 $x_{2i+1}$=sell 的双变量设定一致。
+
+Following Herzel \cite{herzel2005}, we classify arbitrage opportunities into two types:
+\begin{itemize}
+    \item \textbf{Type A arbitrage:} a portfolio $\mathbf{x}$ such that $\mathbf{c}'\mathbf{x} = 0$ (zero cost) and the payoff $\Psi_{\mathbf{x}}(S_T) \geq 0$ for all $S_T$, with strict inequality for at least one $S_T$.
+    \item \textbf{Type B arbitrage:} a portfolio $\mathbf{x}$ such that $\mathbf{c}'\mathbf{x} < 0$ (negative cost, i.e., the trader receives money upfront) and $\Psi_{\mathbf{x}}(S_T) \geq 0$ for all $S_T$.
+\end{itemize}
+
+Using Proposition~\ref{prop:payoff_nonneg}, the problem of finding the minimum-cost portfolio with non-negative payoff is formulated as the following LP (Primal problem, equation (3) in \cite{herzel2005}):
+\begin{equation}
+\min_{\mathbf{x}} \; \mathbf{c}'\mathbf{x} \quad \text{s.t.} \quad L\mathbf{x} \geq \mathbf{0},
+\label{eq:primal}
+\end{equation}
+where $\mathbf{c} = (C(K_1), \ldots, C(K_N))'$ is the price vector and $L$ is the payoff matrix with rows corresponding to the breakpoints of Proposition~\ref{prop:payoff_nonneg}. The problem (\ref{eq:primal}) is always feasible (by setting $\mathbf{x} = \mathbf{0}$) and is unbounded if and only if type B arbitrages exist.\\
+
+\textbf{Extension to bid-ask spreads.} In Section~5 of \cite{herzel2005}, Herzel extends the framework to markets with bid-ask spreads by splitting each security into two: a ``bid security'' (which can be sold at the bid price $P_i^b$) and an ``ask security'' (which can be bought at the ask price $P_i^a$, with $P_i^a > P_i^b$). This yields:
+\begin{equation}
+\min_{\mathbf{x}^a, \mathbf{x}^b} \; \mathbf{c}_a'\mathbf{x}^a - \mathbf{c}_b'\mathbf{x}^b \quad \text{s.t.} \quad L(\mathbf{x}^a - \mathbf{x}^b) \geq \mathbf{0}, \; \mathbf{x}^a \geq \mathbf{0}, \; \mathbf{x}^b \geq \mathbf{0},
+\label{eq:primal_bidask}
+\end{equation}
+where $\mathbf{x}^a$ and $\mathbf{x}^b$ represent the quantities bought and sold, respectively. This decomposition is directly adopted in our implementation.
+
+\subsection{Extended Triple-Constrained LP Model}
+% 【写作指导】★ 这是 Own Contribution 的核心 ★
+% 在 Herzel 框架的基础上，加入三重约束以适应真实交易环境。
+
+Building upon Herzel's framework (\ref{eq:primal_bidask}), we now develop the extended LP model that incorporates three practical constraints absent from the classical formulation. This constitutes the primary mathematical contribution of this thesis.\\
+
+\textbf{Decision variables.} For $n$ option contracts, we define $2n$ decision variables:
+\begin{itemize}
+    \item $x_{2i}$: the quantity of contract $i$ to \textit{buy} (at the ask price), $i = 0, 1, \ldots, n-1$,
+    \item $x_{2i+1}$: the quantity of contract $i$ to \textit{sell} (at the bid price), $i = 0, 1, \ldots, n-1$.
+\end{itemize}
+All decision variables are non-negative: $x_j \geq 0$ for $j = 0, 1, \ldots, 2n-1$.\\
+
+\textbf{Objective function.} The objective is to maximise the net premium income, accounting for a proportional exchange fee rate $f$ (e.g., $f = 0.0003$ for OKX taker fees):
+\begin{equation}
+\max \;\; \sum_{i=0}^{n-1} \left[ -\text{ask}_i \cdot (1 + f) \cdot x_{2i} + \text{bid}_i \cdot (1 - f) \cdot x_{2i+1} \right],
+\label{eq:objective}
+\end{equation}
+where $\text{ask}_i$ and $\text{bid}_i$ are the best ask and bid prices for contract $i$. Since LP solvers conventionally minimise, the objective vector $\mathbf{c} \in \mathbb{R}^{2n}$ is defined with signs reversed:
+$$c_{2i} = \text{ask}_i \cdot (1 + f), \quad c_{2i+1} = -\text{bid}_i \cdot (1 - f).$$
+
+% 3.4.3.2 Payoff Constraints (No-Loss Guarantee)
+% 【写作指导】
+% 直接从 Herzel [4] Proposition 3.1 推导出三组约束：
+% 1. 右侧斜率约束（Right-Slope Constraint）：
+%    $$\sum_{\text{Call}} (x_{2i} - x_{2i+1}) \ge 0$$
+%    含义：当 $S_T \to +\infty$ 时组合价值不发散为 $-\infty$。
+%    对应代码 arbitrage_service.py 第 78-85 行。
+% 2. $S_T = 0$ 处的约束：
+%    $$\sum_{\text{Put}} K_i \cdot (x_{2i} - x_{2i+1}) \ge 0$$
+%    对应代码第 87-94 行。
+% 3. 逐行权价约束：$\forall K_j$，
+%    $$\sum_{i=0}^{n-1} \text{payoff}(K_j, K_i, \text{type}_i) \cdot (x_{2i} - x_{2i+1}) \ge 0$$
+%    对应代码第 96-105 行。
+
+\textbf{Constraint 1: Payoff non-negativity (from Herzel framework).} Following Proposition~\ref{prop:payoff_nonneg}, we impose three groups of payoff constraints to ensure the portfolio does not lose money in any state of the world:\\
+
+\textit{(1a) Right-slope constraint.} This ensures that the portfolio value does not diverge to $-\infty$ as $S_T \to +\infty$:
+\begin{equation}
+\sum_{i \in \mathcal{C}} (x_{2i} - x_{2i+1}) \geq 0,
+\label{eq:right_slope}
+\end{equation}
+where $\mathcal{C}$ is the set of call option indices. This constraint arises because each net long call contributes a slope of $+1$ and each net short call contributes $-1$ to the portfolio payoff for large $S_T$.\\
+
+\textit{(1b) Payoff at $S_T = 0$.} This ensures non-negative payoff when the underlying becomes worthless:
+\begin{equation}
+\sum_{i \in \mathcal{P}} K_i \cdot (x_{2i} - x_{2i+1}) \geq 0,
+\label{eq:payoff_zero}
+\end{equation}
+where $\mathcal{P}$ is the set of put option indices. At $S_T = 0$, each put with strike $K_i$ has payoff $K_i$, while all calls have zero payoff.\\
+
+\textit{(1c) Per-strike payoff constraints.} For each distinct strike price $K_j$ appearing in the market:
+\begin{equation}
+\sum_{i=0}^{n-1} \Psi_i(K_j) \cdot (x_{2i} - x_{2i+1}) \geq 0,
+\label{eq:per_strike}
+\end{equation}
+where $\Psi_i(K_j)$ is evaluated using (\ref{eq:payoff}). These constraints ensure non-negative portfolio payoff at each breakpoint.\\
+
+% 3.4.3.3 Capital Budget Constraint (本文新增)
+% 【写作指导】
+% Herzel [4] 未考虑资金限制。本文新增：
+% $$\sum_{i=0}^{n-1} \left[ \hat{a}_i \cdot c_m \cdot x_{2i} + \hat{b}_i \cdot M \cdot c_m \cdot x_{2i+1} \right] \le B_{\text{BTC}}$$
+% 其中 $\hat{a}_i = \text{ask}_i / S_{\text{spot}}$, $c_m = 0.01$ (合约乘数), $M = 2.0$ (卖方保证金倍率)。
+% 对应代码第 107-119 行。
+
+\textbf{Constraint 2: Capital budget (new).} The Herzel framework does not impose any capital limitation, implying that the trader can take arbitrarily large positions. In practice, all positions require margin. We introduce a budget constraint expressed in BTC:
+\begin{equation}
+\sum_{i=0}^{n-1} \left[ \hat{a}_i \cdot c_m \cdot x_{2i} + \hat{a}_i \cdot M \cdot c_m \cdot x_{2i+1} \right] \leq B,
+\label{eq:budget}
+\end{equation}
+where:
+\begin{itemize}
+    \item $\hat{a}_i = \text{ask}_i / S_{\text{spot}}$ converts the USD-denominated ask price to BTC units,
+    \item $c_m = 0.01$ is the contract multiplier (each OKX/Deribit option contract represents 0.01 BTC of the underlying),
+    \item $M = 2.0$ is the seller's margin multiplier (selling options requires approximately twice the premium as margin collateral on OKX),
+    \item $B$ is the total capital budget in BTC.
+\end{itemize}
+
+% 3.4.3.4 Liquidity Depth Constraint (本文新增)
+% 【写作指导】
+% Herzel [4] 假设无限流动性。本文用LP变量上界引入订单簿深度限制：
+% $$0 \le x_{2i} \le \text{askSize}_i, \quad 0 \le x_{2i+1} \le \text{bidSize}_i$$
+% 对应代码第 121-127 行。
+% 这是本项目的核心创新——将LP从"纸面套利"升级为"可执行套利"。
+
+\textbf{Constraint 3: Liquidity depth (new).} The classical assumption of unlimited liquidity is particularly unrealistic in cryptocurrency options markets, where the top-of-book depth at any given strike may consist of only a few contracts \cite{goyenko2009}. We impose upper bounds on each decision variable based on the real-time order book depth:
+\begin{equation}
+0 \leq x_{2i} \leq \text{askSize}_i, \quad 0 \leq x_{2i+1} \leq \text{bidSize}_i, \quad i = 0, \ldots, n-1,
+\label{eq:liquidity}
+\end{equation}
+where $\text{askSize}_i$ and $\text{bidSize}_i$ are the available quantities at the best ask and best bid prices, respectively and we only considers the first level of the order book to avoid slippage. This constraint transforms the LP from detecting ``paper arbitrage'' (theoretically profitable but unexecutable due to insufficient liquidity) into detecting \textit{executable arbitrage}---opportunities that can actually be captured given the current market conditions.
+
+\subsection{Complete LP Formulation Summary}
+% 【写作指导】
+% 用 boxed equation 环境总结整个LP模型：
+% $$\boxed{
+% \begin{aligned}
+% \min \quad & \mathbf{c}^T \mathbf{x} \\
+% \text{s.t.} \quad & A_{\text{ub}} \mathbf{x} \le \mathbf{b}_{\text{ub}} \\
+% & \mathbf{0} \le \mathbf{x} \le \mathbf{u}
+% \end{aligned}
+% }$$
+% 用表格列出约束矩阵 $A_{\text{ub}}$ 每行的含义和行数：
+% 行数 = 1(right-slope) + 1(payoff at 0) + |K|(per-strike payoffs) + [1](budget, optional)
+% 列出与 Herzel [4] 的对比：哪些约束来自理论，哪些是本文新增。
+
+Combining the objective (\ref{eq:objective}) and constraints (\ref{eq:right_slope})--(\ref{eq:liquidity}), the complete LP formulation is:
+\begin{equation}
+\boxed{
+\begin{aligned}
+\min_{\mathbf{x}} \quad & \mathbf{c}^T \mathbf{x} \\
+\text{subject to} \quad & A_{\text{ub}} \, \mathbf{x} \leq \mathbf{b}_{\text{ub}} \\
+& \mathbf{0} \leq \mathbf{x} \leq \mathbf{u}
+\end{aligned}
+}
+\label{eq:complete_lp}
+\end{equation}
+where:
+\begin{itemize}
+    \item $\mathbf{x} \in \mathbb{R}^{2n}$ is the vector of decision variables (buy/sell quantities),
+    \item $\mathbf{c} \in \mathbb{R}^{2n}$ is the fee-adjusted objective vector defined above,
+    \item $A_{\text{ub}} \in \mathbb{R}^{m \times 2n}$ and $\mathbf{b}_{\text{ub}} \in \mathbb{R}^m$ encode the inequality constraints (note that payoff constraints are converted to $\leq$ form by negation),
+    \item $\mathbf{u} \in \mathbb{R}^{2n}$ contains the upper bounds from the liquidity depth constraint (\ref{eq:liquidity}).
+\end{itemize}
+
+The structure of the constraint matrix $A_{\text{ub}}$ is summarised in Table~\ref{tab:constraints}.
+
+\begin{table}[H]
+\centering
+\caption{Constraint matrix structure for the triple-constrained LP model.}
+\label{tab:constraints}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Constraint} & \textbf{Number of rows} & \textbf{Source} \\
+\hline
+Right-slope (Eq.~\ref{eq:right_slope}) & 1 & Herzel \cite{herzel2005} \\
+Payoff at $S_T = 0$ (Eq.~\ref{eq:payoff_zero}) & 1 & Herzel \cite{herzel2005} \\
+Per-strike payoffs (Eq.~\ref{eq:per_strike}) & $|\mathcal{K}|$ & Herzel \cite{herzel2005} \\
+Capital budget (Eq.~\ref{eq:budget}) & 0 or 1 & New (this thesis) \\
+\hline
+\textbf{Total rows of $A_{\text{ub}}$} & $2 + |\mathcal{K}| + [1]$ & \\
+\hline
+Liquidity bounds (Eq.~\ref{eq:liquidity}) & (via $\mathbf{u}$) & New (this thesis) \\
+\hline
+\end{tabular}
+\end{table}
+
+Here $|\mathcal{K}|$ denotes the number of distinct strike prices and $[1]$ indicates that the budget constraint is optional (included only if a finite budget $B$ is specified). The total number of decision variables is $2n$, where $n$ is the number of active option contracts.\\
+
+If the LP solver returns an optimal solution $\mathbf{x}^*$ with objective value $\mathbf{c}^T\mathbf{x}^* < 0$, then the negated value $-\mathbf{c}^T\mathbf{x}^*$ represents the guaranteed minimum profit (in USD) of the identified arbitrage portfolio, after accounting for transaction costs and liquidity constraints.
+
+\section{Solver Selection: SciPy HiGHS}
+% 【写作指导】
+% 1. 对比可选求解器：javascript-lp-solver (旧实现)、GLPK、Gurobi、SciPy HiGHS。
+% 2. 选择 HiGHS 的理由：2021 INFORMS 优化软件奖，支持对偶单纯形 + 内点法混合策略，
+%    在大规模稀疏问题上效率优异，且免费开源。
+% 3. 调用方式：scipy.optimize.linprog(c, A_ub, b_ub, bounds, method='highs')。
+
+The LP formulation (\ref{eq:complete_lp}) is solved using the HiGHS solver \cite{huangfu2018}, accessed via the Python interface \texttt{scipy.optimize.linprog} with \texttt{method='highs'}. HiGHS is an open-source, high-performance solver for linear programming that received the 2021 INFORMS Optimization Software Prize. It employs a hybrid strategy combining the dual revised simplex method for warm-starting and exploitation of problem structure, with an interior-point method for numerical robustness on ill-conditioned problems \cite{huangfu2018}.\\
+
+Several alternative LP solvers were considered. GLPK (GNU Linear Programming Kit) is open-source but lacks the advanced presolve and scaling techniques that HiGHS provides, resulting in slower performance on sparse problems. Gurobi is a commercial solver with excellent performance, but requires a paid license for non-academic use, limiting reproducibility. HiGHS was selected for three reasons: (i) it achieves solving times of 1--10 ms for problems of the size encountered in this application ($2n \approx 200$--$600$ variables), which is well within the 500 ms throttle interval, (ii) its numerical stability is ensured by advanced ratio tests with numerical tolerances, avoiding the spurious infeasibility results that simpler implementations may produce, and (iii) it is bundled with SciPy (no additional installation required), enabling seamless integration with NumPy for vectorised constraint matrix construction.\\
+
+The LP is invoked as:
+\begin{verbatim}
+    result = scipy.optimize.linprog(
+        c, A_ub=A_ub, b_ub=b_ub,
+        bounds=bounds, method='highs'
+    )
+\end{verbatim}
+where \texttt{bounds} is a list of $(0, u_j)$ pairs encoding the liquidity constraints (\ref{eq:liquidity}). If \texttt{result.fun} $< -\epsilon$ (where $\epsilon$ is a small tolerance, typically \$0.01), an arbitrage opportunity is detected.
+
+% ==================================================
+% Chapter 4: System Architecture and Implementation
+%   (评分标准: Own Contribution 20% 的重要部分)
+% ==================================================
+\chapter{System Architecture and Implementation}
+% 【评分标准: 属于 "Added Value and Own Contribution" (20%) 的核心加分项】
+% 最高分要求: "The student reworked and collated the available material in a transformative way
+% to achieve the project's objectives, adding substantial value."
+%
+% 【总体指导】
+% 本章展示将第3章数学模型落地为工程系统的能力。
+% 注意：模板中此章对应 "Simulation or Data Illustration"，但本项目的实现本身是
+% 核心贡献（将数学理论转化为可运行的自动化系统），因此需要详细展开。
+% 建议全章开头放一张系统架构图。
+
+\section{Architecture Overview: Decoupled Client-Server Design}
+% 【写作指导】
+% 1. 画一个系统架构图（用 TikZ 或导入图片）：
+%    [OKX WS API] → [OKX WsEngine] → [ArbitrageEngine (LP)] → [SSE Manager] → [React Frontend]
+%    [Deribit WS API] → [DeribitWsEngine] →↗
+%    [ArbitrageEngine] → [Trading Service (REST)] → [Exchange]
+%    [ArbitrageEngine] → [Email Notifier] / [Execution Store (JSONL)]
+% 2. 解耦架构的设计理由：后端独立运行，浏览器关闭仍持续监控和自动执行。
+% 3. 技术栈：Python 3.11 + FastAPI + uvicorn / React 18 + Vite + TypeScript / SciPy HiGHS。
+
+\section{Real-Time Data Ingestion Layer}
+% 【写作指导】
+
+\subsection{Dual-Exchange WebSocket Engines}
+% 【写作指导】
+% 1. OKX WsEngine 和 DeribitWsEngine 的统一设计模式。
+% 2. 适配器模式（Adapter Pattern）：
+%    OKX ("BTC-USD-260404-60000-C") vs Deribit ("BTC-4APR26-60000-C")
+%    → 统一 OptionData 模型。
+
+\subsection{Throttled Data Pipeline}
+% 【写作指导】
+% 1. 瞬时回调 vs 节流回调（500ms）的分离设计：
+%    - on_instant_update: 仅记录时间戳，零开销
+%    - on_throttled_update: 执行数组构建 + LP求解
+% 2. SSE 广播节流：完整期权数据每5秒一次，避免前端过载。
+% 3. 背压机制：asyncio.Queue(maxsize=50)，满时丢弃最旧消息。
+
+\subsection{Auto-Reconnection and Staleness Watchdog}
+% 【写作指导】
+% 1. 指数退避重连：$\min(2^n, 30)$ 秒。
+% 2. 数据过期看门狗：30秒检查一次，60秒无数据则强制断开重连。
+%    解决"TCP存活但业务层无数据"的僵尸连接问题。
+
+\section{LP Solver Integration}
+% 【写作指导】
+% 展示第3章数学公式 → Python代码的精确映射。
+% 可包含关键代码片段（arbitrage_service.py核心30行）配合公式行号对照表。
+
+\section{Multi-Expiry Global Scanning}
+% 【写作指导】
+% 1. ArbitrageEngine._scan_all_expiries()：按 expiration 分组，独立求解，全局取最优。
+% 2. 预过滤（minVolume, maxSpreadPct）减少LP调用次数。
+% 3. 时间复杂度：$O(E \cdot \bar{n}^3)$，$E$=到期日数，$\bar{n}$=平均合约数。
+
+\section{Automated Order Execution Engine}
+% 【写作指导】
+% 完整执行链路：
+% (a) 信号去重 → (b) 30s冷却期 → (c) 合约有效性验证 →
+% (d) 自交易检测 → (e) 零价格过滤 → (f) Batch Order API下单 →
+% (g) HMAC-SHA256签名 → (h) 订单状态轮询（10s周期）。
+
+\section{Supporting Infrastructure}
+% 【写作指导】简要介绍：
+% 1. SSE Manager：vs WebSocket 的选型理由（单向推送 + 浏览器原生重连）。
+% 2. JSONL Execution Store：追加写入，启动恢复。
+% 3. Email Notifier：aiosmtplib异步发送，5分钟冷却。
+% 4. React SSE Hook (useBackendSSE)：13种事件类型映射到React状态。
+
+% ==================================================
+% Chapter 5: Results and Evaluation
+%   (评分标准: Scope/Depth 10% + Own Contribution 20%)
+% ==================================================
+\chapter{Results and Evaluation}
+% 【评分标准: 10% Scope/Depth + 属于 20% Own Contribution】
+% 最高分需要: tables/figures/illustrations + examples/applications。
+% 本章需要大量图表和系统截图。
+
+\section{LP Solver Validation}
+% 【写作指导】
+% 1. 合成数据验证（Synthetic Data Validation）：
+%    - 案例1：人为制造 Butterfly Spread 违规 → LP检测并计算利润
+%    - 案例2：所有价格满足 Herzel Theorem 4.1 的凸性条件 → LP返回 non-feasible
+%    - 案例3：价格一致但流动性为0 → 深度约束阻止"纸面套利"
+% 2. 手动计算预期利润与LP输出对比。
+
+\section{Live Market Monitoring Results}
+% 【写作指导】
+% 1. 连续运行系统若干天，记录：
+%    - 套利机会频率和持续时间（Arbitrage Window Duration）
+%    - 利润分布
+%    - OKX vs Deribit 的对比
+% 2. 附UI截图和系统日志。
+% 3. 分析"瞬时套利"现象。
+
+\section{System Performance Analysis}
+% 【写作指导】
+% 1. 端到端延迟分解：WS消息→tick_map→options array→LP solve→SSE→frontend
+% 2. LP求解时间（单个到期日 vs 全局扫描）。
+% 3. 内存使用分析。
+
+\section{Execution Engine Testing}
+% 【写作指导】
+% 1. OKX模拟盘 / Deribit测试网的执行测试。
+% 2. 成功率、部分成交率、失败原因分析。
+% 3. 展示 executions.jsonl 中的真实记录。
+
+% ==================================================
+% Chapter 6: Discussion  (评分标准: Scope/Depth + Rigor)
+% ==================================================
+\chapter{Discussion}
+% 【评分标准: Critical Thinking 是高分的关键区分因素】
+% 最高分要求: "possible weaknesses are identified"
+% "can combine different ideas and sources to effectually achieve the objectives"
+
+\section{Market Microstructure Frictions}
+% 【写作指导】
+% 1. 幻影流动性（Phantom Liquidity）：执行瞬间撤单导致失败。
+% 2. 滑点（Slippage）：仅用Top of Book的局限。
+% 3. 时间戳不同步（Clock Skew）：跨交易所数据到达时间差异。
+
+\section{Model Limitations}
+% 【写作指导】
+% 1. 静态LP的固有局限：不考虑动态对冲、IV变化、资金锁定。
+% 2. 连续变量 vs 整数约束：LP松弛可能导致分数解。
+% 3. 常数手续费率假设（实际随VIP等级变化）。
+% 4. 与 Herzel [4] 的比较：本文扩展了流动性和资金约束，
+%    但仍继承了 Herzel 假设（如收益是分段线性的、只考虑同一到期日同一底层资产）。
+
+\section{Architecture Limitations}
+% 【写作指导】
+% 1. 地理延迟：本地 vs 靠近交易所的数据中心。
+% 2. 单线程LP求解的瓶颈。
+% 3. SSE的单向通信限制。
+
+\section{Future Work}
+% 【写作指导】
+% 1. 短期：整数规划（ILP）、多档订单簿建模、跨所联合套利。
+% 2. 中期：VPS部署（AWS东京）、Greeks感知风险管理。
+% 3. 长期：SOCP/鲁棒优化、IV曲面建模+波动率套利。
+
+% ==================================================
+% Chapter 7: Conclusion  (呼应 Introduction)
+% ==================================================
+\chapter{Conclusion}
+% 【写作指导】
+% 评分标准中 Conclusion 属于 "Organization and Presentation" (10%) 的一部分。
+% 模板建议约 200-300 词。
+%
+% 1. 总结三层贡献（呼应 Section 1.3 Research Objectives）：
+%    - 数学：基于 Herzel [4] 框架，构建三重约束LP模型，对偶变量对应状态价格。
+%    - 系统：解耦的Python后端 + React前端，双交易所并行数据引擎 + 全到期日扫描。
+%    - 工程：完整自动化执行链路 (WS→LP→Order→Poll→Email→JSONL)。
+% 2. 学术意义：将经典金融数学理论（LP无套利定理）应用于加密货币市场的实时生产系统。
+% 3. 可扩展性：模块化架构可扩展至更多交易所和资产类别。
+
+\newpage
+% 【评分标准: Bibliography and Citations 5%】
+% 最高分要求: "Relevant information is cited in a clear and correct way.
+% Sufficiently many different sources have been used, and these have appropriate academic value.
+% The bibliography is typeset consistently and all bibliographic items are used in the project."
+%
+% 使用 siam 样式（模板硬性要求）。
+% 确保所有 \cite{} 在正文中出现过，所有 .bib 条目都在正文中被引用。
+\bibliography{ref_fyp}{}
+\bibliographystyle{siam}
+
+\end{document}
