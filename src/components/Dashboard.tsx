@@ -69,23 +69,33 @@ export default function Dashboard({ lang, onLanguageChange }: { lang: Language; 
     backendActiveExchange,
   } = useBackendSSE(wsEnabled);
 
+  // ── Determine if frontend LP is needed ─────────────────────────────────
+  // Frontend LP is needed when:
+  //   1. WebSocket is disabled (REST fallback mode), OR
+  //   2. Demo mode is active AND user has applied price modifications
+  const hasDemoModifications = isDemoMode && Object.keys(appliedModifications).length > 0;
+  const needsFrontendLP = !wsEnabled || hasDemoModifications;
+
+  // Use a ref to make needsFrontendLP accessible in effects without causing re-subscriptions
+  const needsFrontendLPRef = useRef(needsFrontendLP);
+  needsFrontendLPRef.current = needsFrontendLP;
+
   // Sync SSE → Zustand store
   useEffect(() => { setHasCredentials(hasCredentials); }, [hasCredentials, setHasCredentials]);
-  
-  const needsFrontendLP = !wsEnabled || (isDemoMode && Object.keys(appliedModifications).length > 0);
 
+  // Sync SSE arb results — but NEVER when frontend LP is active (demo mode)
   useEffect(() => {
-    // If frontend is doing custom LP (demo mode), don't let SSE overwrite it!
-    if (wsEnabled && sseArbResult && !needsFrontendLP) {
+    if (wsEnabled && sseArbResult && !needsFrontendLPRef.current) {
       setBestArbResult(sseArbResult);
     }
-  }, [sseArbResult, wsEnabled, setBestArbResult, needsFrontendLP]);
+  }, [sseArbResult, wsEnabled, setBestArbResult]);
   
   useEffect(() => {
-    if (wsEnabled && sseArbExpiry !== undefined && !needsFrontendLP) {
+    if (wsEnabled && sseArbExpiry !== undefined && !needsFrontendLPRef.current) {
       setBestArbExpiry(sseArbExpiry);
     }
-  }, [sseArbExpiry, wsEnabled, setBestArbExpiry, needsFrontendLP]);
+  }, [sseArbExpiry, wsEnabled, setBestArbExpiry]);
+
   useEffect(() => {
     if (sseAltArbResult) setAltArbResult(sseAltArbResult);
   }, [sseAltArbResult, setAltArbResult]);
@@ -104,10 +114,11 @@ export default function Dashboard({ lang, onLanguageChange }: { lang: Language; 
   }, [serverExecutions, wsEnabled]);
 
   // ── Live data buffer ───────────────────────────────────────────────────
-  // Strictly bind backend options to the acknowledged exchange to prevent poisoning the buffer 
-  // with stale ticks from the old exchange during a rapid UI swap.
-  const actualBackendOptions = selectedExchange === backendActiveExchange ? backendOptions : [];
-  const { commitLiveData, hasNewData } = useLiveDataBuffer(actualBackendOptions);
+  // Only feed options from the currently selected exchange to the buffer.
+  // When backendActiveExchange doesn't match selectedExchange, feed empty
+  // so the buffer treats subsequent matching data as "first load" (instant render).
+  const filteredBackendOptions = selectedExchange === backendActiveExchange ? backendOptions : [];
+  const { commitLiveData, hasNewData } = useLiveDataBuffer(filteredBackendOptions);
 
   const activeWsStatus = selectedExchange === 'okx' ? wsStatus : deribitWsStatus;
   const isDataStale = !isBackendOnline || activeWsStatus !== 'connected';

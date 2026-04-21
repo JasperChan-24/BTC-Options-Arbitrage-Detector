@@ -9,7 +9,7 @@
  *  4. Auto-refresh every 30s
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import type { OptionData } from '../types';
 
@@ -24,7 +24,11 @@ export function useLiveDataBuffer(backendOptions: OptionData[]) {
   } = useAppStore();
   const effectiveMinVolume = useAppStore((s) => s.effectiveMinVolume());
   const effectiveMaxSpreadPct = useAppStore((s) => s.effectiveMaxSpreadPct());
-  const hasNewData = useRef(false);
+  const [hasNewData, setHasNewData] = useState(false);
+
+  // Track the exchange for which we last committed data.
+  // This prevents re-committing stale data from a previous exchange.
+  const committedExchangeRef = useRef<string>(selectedExchange);
 
   const commitLiveData = useCallback(() => {
     const live = liveOptionsRef.current;
@@ -32,9 +36,10 @@ export function useLiveDataBuffer(backendOptions: OptionData[]) {
       setOptions(live);
       setLastUpdated(new Date());
       setLoading(false);
-      hasNewData.current = false;
+      setHasNewData(false);
+      committedExchangeRef.current = selectedExchange;
     }
-  }, [setOptions, setLastUpdated, setLoading]);
+  }, [setOptions, setLastUpdated, setLoading, selectedExchange]);
 
   // When SSE sends new options, buffer them
   useEffect(() => {
@@ -62,7 +67,7 @@ export function useLiveDataBuffer(backendOptions: OptionData[]) {
         }
       }
     } else {
-      hasNewData.current = true;
+      setHasNewData(true);
     }
   }, [backendOptions, commitLiveData, effectiveMinVolume, effectiveMaxSpreadPct, selectedExpiry, setSelectedExpiry]);
 
@@ -85,7 +90,8 @@ export function useLiveDataBuffer(backendOptions: OptionData[]) {
   // Clear buffer when exchange changes so we don't accidentally display old data
   useEffect(() => {
     liveOptionsRef.current = [];
-    hasNewData.current = false;
+    setHasNewData(false);
+    committedExchangeRef.current = selectedExchange;
   }, [selectedExchange]);
 
   // On expiry switch — commit latest
@@ -96,6 +102,6 @@ export function useLiveDataBuffer(backendOptions: OptionData[]) {
   return {
     commitLiveData,
     liveOptionsRef,
-    hasNewData: hasNewData.current,
+    hasNewData,
   };
 }

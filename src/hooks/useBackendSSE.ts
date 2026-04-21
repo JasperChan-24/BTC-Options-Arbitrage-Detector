@@ -114,19 +114,23 @@ export function useBackendSSE(enabled: boolean): BackendState {
           break;
 
         case 'ticker':
-          setTickerCount(data.count ?? 0);
-          setSpotPrice(data.spotPrice ?? 0);
           if (data.wsStatus) setWsStatus(data.wsStatus);
-          // Only update options if OKX is the active exchange
-          if (data.options && activeExchangeRef.current === 'okx') setOptions(data.options);
+          // Only update options if OKX is the active exchange AND market matches
+          if (activeExchangeRef.current === 'okx') {
+            setTickerCount(data.count ?? 0);
+            setSpotPrice(data.spotPrice ?? 0);
+            if (data.options) setOptions(data.options);
+          }
           break;
 
         case 'deribit_ticker':
-          setTickerCount(data.count ?? 0);
-          setSpotPrice(data.spotPrice ?? 0);
           if (data.wsStatus) setDeribitWsStatus(data.wsStatus);
-          // Only update options if Deribit is the active exchange
-          if (data.options && activeExchangeRef.current === 'deribit') setOptions(data.options);
+          // Only update options if Deribit is the active exchange AND market matches
+          if (activeExchangeRef.current === 'deribit') {
+            setTickerCount(data.count ?? 0);
+            setSpotPrice(data.spotPrice ?? 0);
+            if (data.options) setOptions(data.options);
+          }
           break;
 
         case 'arbitrage':
@@ -188,6 +192,8 @@ export function useBackendSSE(enabled: boolean): BackendState {
           if (data.activeExchange) {
             activeExchangeRef.current = data.activeExchange;
             setBackendActiveExchange(data.activeExchange);
+            // Clear options immediately so the buffer treats next data as fresh
+            setOptions([]);
           }
           break;
 
