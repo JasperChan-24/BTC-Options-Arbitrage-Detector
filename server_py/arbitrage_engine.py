@@ -173,7 +173,7 @@ class ArbitrageEngine:
         self._latest_options[market_id] = options  # cache for budget LP re-solve
         
         # Offload CPU-heavy LP solving to a background thread
-        scan = await asyncio.to_thread(self._scan_all_expiries, options, exchange)
+        scan = await asyncio.to_thread(self._scan_all_expiries, options, exchange, market_id)
         
         result = scan["result"]
         expiry = scan["expiry"]
@@ -265,9 +265,9 @@ class ArbitrageEngine:
     # ─── Scan all expiries for best arbitrage ─────────────────────────────
 
     def _scan_all_expiries(
-        self, options: List[OptionData], exchange: ActiveExchange
+        self, options: List[OptionData], exchange: ActiveExchange,
+        market_id: Optional[str] = None,
     ) -> dict:
-        min_volume = self._config.minVolume
         max_spread_pct = self._config.maxSpreadPct
         include_fee = self._config.includeFee
         budget_btc = (
@@ -275,6 +275,10 @@ class ArbitrageEngine:
             if exchange == "okx"
             else self._config.deribitBudgetBtc
         )
+
+        # Testnet/paper markets have very low volume — bypass volume filter
+        is_testnet = market_id in TEST_MARKETS if market_id else False
+        min_volume = 0 if is_testnet else self._config.minVolume
 
         filtered = [
             o
