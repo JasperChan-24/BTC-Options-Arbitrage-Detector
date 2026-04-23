@@ -112,13 +112,11 @@ I would like to express my deepest gratitude to my supervisor, Dr. Yun Lu, for t
 
 \section{Background: Cryptocurrency Derivatives and Market Structure}
 % 【写作指导】
-% 1. 介绍加密货币衍生品市场的崛起（以BTC期权在Deribit和OKX的发展为例），
-%    引用市场份额数据（如Deribit占全球BTC期权交易量的85%+）。
-% 2. 与传统金融市场（如CBOE期权）对比：加密市场的特殊性——
-%    24/7不间断交易、跨所流动性碎片化（Liquidity Fragmentation）、
-%    BTC结算（Coin-margined）而非USD结算的定价机制。
-% 3. 定义静态套利（Static Arbitrage）——通过一次性构建期权组合、
+% 1. 简单介绍什么是套利及其背景。
+% 2. 定义静态套利（Static Arbitrage）——通过一次性构建期权组合、
 %    持有至到期获取无风险利润——强调与动态套利/Delta Hedging的*区别*。
+% 3. 与传统金融市场（如CBOE期权）对比：加密市场的特殊性——
+%    24/7不间断交易、跨所流动性碎片化（Liquidity Fragmentation）。
 % 4. 收尾：自然引出"如何用严格数学方法系统性检测此类无风险机会？"
 
 The cryptocurrency derivatives market has experienced rapid growth over the past decade, with Bitcoin (BTC) options emerging as a major asset class. Deribit, founded in 2016, currently dominates the global BTC options market, accounting for over 85\% of the total trading volume \cite{cao2021}. OKX, operated by OKEx, has established itself as the second-largest venue, offering inverse (coin-margined) options contracts settled in BTC rather than fiat currency. The Chicago Board Options Exchange (CBOE) launched Bitcoin futures in December 2017, marking the entry of traditional financial infrastructure into the cryptocurrency derivatives space.\\
@@ -158,7 +156,7 @@ Linear Programming provides a natural solution to these challenges. By formulati
 % 【写作指导】按3个层次递进：
 % 1. 数学层面：基于Herzel框架，构建包含交易成本、资金预算、订单簿深度的
 %    三重约束LP套利检测模型。
-% 2. 系统层面：设计解耦的客户端-服务器架构（Python后端独立运行 + React前端纯展示），
+% 2. 系统层面：设计解耦的客户端-服务器架构，
 %    实现双交易所（OKX + Deribit）并行WebSocket数据引擎和全到期日并行扫描。
 % 3. 工程层面：实现自动IOC下单引擎、订单状态轮询、邮件通知、执行历史持久化存储。
 
@@ -205,6 +203,9 @@ Chapter~7 concludes the thesis by summarising the contributions at the mathemati
 % 【总体提醒】每节需综合多篇文献并进行批判性分析（Critical Synthesis），而非逐篇罗列。
 % 评分标准特别看重是否 "leads easily into the rest of the project"，
 % 所以每节末尾都应说明该文献主题如何与本项目的具体工作相关联。
+% 不需要引用公式，只需要讲清楚概念和理论框架即可。整体长度不需要太长，但要讲清楚每个文献的核心贡献和与本项目的联系。
+% 写每一个文献时要注意和下一个文献的逻辑衔接，形成一个连贯的叙述，而不是孤立的段落。
+% 对于methodology有的部分 不需要在这里写的太详细，只需要简略讲清楚核心概念和理论框架即可，具体的数学建模和算法实现细节留到Methodology章节。
 
 \section{Linear Programming in Financial Engineering}
 % 【写作指导】
@@ -213,7 +214,7 @@ Chapter~7 concludes the thesis by summarising the contributions at the mathemati
 % 2. Cornuejols \& Tütüncü (2006) [17] 教材中LP在金融中的系统性介绍。
 % 3. 批判性分析：传统LP模型假设连续变量和完美流动性，不适用于加密市场稀薄订单簿——
 %    →引出本文在LP约束中加入流动性深度限制的创新。
-% 注意：可直接引用你interim report中Section 2.1的内容和文献编号。
+% 注意：可直接引用interim report中Section 2.1的内容和文献编号。
 
 Linear Programming (LP) is a cornerstone of mathematical optimisation, seeking to maximise or minimise a linear objective function subject to linear equality and inequality constraints. The LP standard form is given by:
 $$\min_{\mathbf{x}} \; \mathbf{c}^T\mathbf{x} \quad \text{s.t.} \quad A\mathbf{x} = \mathbf{b}, \; \mathbf{x} \geq \mathbf{0},$$
@@ -229,7 +230,7 @@ A critical observation relevant to this project is that classical LP formulation
 % 【写作指导】
 % 1. 资产定价基本定理（FTAP）：Delbaen \& Schachermayer (1994) [12]：
 %    无套利 ⟺ 存在等价鞅测度。
-% 2. 期权价格必须满足的静态无套利条件（可直接引用你interim report Section 2.2的内容）：
+% 2. 期权价格必须满足的静态无套利条件（可直接引用interim report Section 2.2的内容）：
 %    - Kuhn (2008) [13] strict no-arbitrage with transaction costs
 %    - Socolovsky (2013) [14] Geometric Arbitrage Theory (GAT)
 % 3. **重点引用 Herzel (2005) [4]**——本项目的理论基础：
@@ -289,7 +290,7 @@ In the cryptocurrency derivatives space specifically, Alexander et al. \cite{ale
 % 2. 事件驱动架构 vs 轮询架构：WebSocket推送 vs REST轮询。
 % 3. 批判性分析：学术文献中的低延迟方案多针对传统金融（FIX协议、内核旁路），
 %    加密货币市场有其独特的API限制和地理延迟问题——
-%    →引出本文的节流（Throttling）、数据过期看门狗（Staleness Watchdog）设计。
+%    →引出本项目的设计。
 
 The design and implementation of low-latency trading systems has been extensively studied in the context of traditional financial markets. Aldridge \cite{aldridge2013} provides a comprehensive treatment of high-frequency trading (HFT) strategies and system architecture, emphasising the critical role of latency minimisation in capturing fleeting arbitrage opportunities. Narang \cite{narang2013} offers a complementary perspective on quantitative and high-frequency trading from the practitioner's viewpoint, discussing the practical challenges of system implementation. Hasbrouck and Saar \cite{hasbrouck2013} empirically analyse low-latency trading in equity markets, demonstrating that the latency of market data arrival and order submission directly impacts the profitability of latency-sensitive strategies.\\
 
@@ -309,9 +310,10 @@ These constraints motivate several design decisions in the present system, inclu
 %
 % 【总体策略】
 % 本章可分为两部分：
-%   Part I (3.1-3.3)：LP基础理论——可大量复用/引用你 interim report 中 Chapter 3 的内容。
+%   Part I (3.1-3.3)：LP基础理论——可大量复用/引用 interim report 中 Chapter 3 的内容。
 %   Part II (3.4-3.5)：套利检测LP建模——结合 Herzel [4] 的理论框架 + 你自己的三重约束扩展。
 % 这样既展示数学深度（评分标准要求），又体现 "Own Contribution"（将理论扩展为实用模型）。
+% 注意：Methodology部分的核心是数学建模和理论分析，代码实现细节留到System Architecture章节。只需要讲到本项目中使用的数学方法和理论框架即可。
 
 This chapter presents the mathematical methodology underlying the arbitrage detection system. Section~3.1 reviews the essential LP theory, including standard form, duality, and complementary slackness. Section~3.2 then develops the LP formulation for arbitrage detection, beginning with the classical framework of Herzel \cite{herzel2005} and extending it with three practical constraints. Section~3.3 discusses the choice of LP solver.
 
@@ -361,7 +363,7 @@ where $A \in \mathbb{R}^{m \times n}$ is the constraint matrix and $\mathbf{b} \
 The \textit{Simplex Method}, introduced by Dantzig \cite{dantzig1947}, exploits this vertex optimality property by moving along edges of the polytope from one vertex to an adjacent vertex with a better objective value. While the simplex method has exponential worst-case complexity, it performs extremely well in practice. Modern LP solvers, such as HiGHS \cite{huangfu2018}, employ a combination of the dual simplex method and interior-point methods (IPMs) to achieve robust and efficient performance on large-scale problems. Interior-point methods, unlike the simplex method, traverse the interior of the polytope and converge in polynomial time.
 
 \subsection{Duality Theory}
-% 【写作指导】
+% 【写作指导】（如果你认为本项目与对偶理论的联系不够紧密，也可以选择不写这一节，直接进入下一节的建模部分）
 % 可直接复用 interim report Section 3.2 "Duality" 的内容，包括：
 % - Weak Duality Theorem (Theorem 3.2.1 in interim) 及其证明
 % - Strong Duality Theorem (Theorem 3.2.2)
@@ -662,7 +664,7 @@ If the LP solver returns an optimal solution $\mathbf{x}^*$ with objective value
 
 \section{Solver Selection: SciPy HiGHS}
 % 【写作指导】
-% 1. 对比可选求解器：javascript-lp-solver (旧实现)、GLPK、Gurobi、SciPy HiGHS。
+% 1. 对比可选求解器：javascript-lp-solver、GLPK、Gurobi、SciPy HiGHS。
 % 2. 选择 HiGHS 的理由：2021 INFORMS 优化软件奖，支持对偶单纯形 + 内点法混合策略，
 %    在大规模稀疏问题上效率优异，且免费开源。
 % 3. 调用方式：scipy.optimize.linprog(c, A_ub, b_ub, bounds, method='highs')。
@@ -697,13 +699,9 @@ where \texttt{bounds} is a list of $(0, u_j)$ pairs encoding the liquidity const
 
 \section{Architecture Overview: Decoupled Client-Server Design}
 % 【写作指导】
-% 1. 画一个系统架构图（用 TikZ 或导入图片）：
-%    [OKX WS API] → [OKX WsEngine] → [ArbitrageEngine (LP)] → [SSE Manager] → [React Frontend]
-%    [Deribit WS API] → [DeribitWsEngine] →↗
-%    [ArbitrageEngine] → [Trading Service (REST)] → [Exchange]
-%    [ArbitrageEngine] → [Email Notifier] / [Execution Store (JSONL)]
+% 1. 画一个系统架构图
 % 2. 解耦架构的设计理由：后端独立运行，浏览器关闭仍持续监控和自动执行。
-% 3. 技术栈：Python 3.11 + FastAPI + uvicorn / React 18 + Vite + TypeScript / SciPy HiGHS。
+% 3. 技术栈
 
 \section{Real-Time Data Ingestion Layer}
 % 【写作指导】
@@ -823,7 +821,7 @@ where \texttt{bounds} is a list of $(0, u_j)$ pairs encoding the liquidity const
 \section{Future Work}
 % 【写作指导】
 % 1. 短期：整数规划（ILP）、多档订单簿建模、跨所联合套利。
-% 2. 中期：VPS部署（AWS东京）、Greeks感知风险管理。
+% 2. 中期：Greeks感知风险管理。
 % 3. 长期：SOCP/鲁棒优化、IV曲面建模+波动率套利。
 
 % ==================================================
