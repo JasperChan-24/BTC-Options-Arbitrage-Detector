@@ -181,7 +181,7 @@ class DeribitWsEngine:
 
     async def _create_connection(self) -> None:
         try:
-            async with websockets.connect(self._get_ws_url(), ping_interval=None) as ws:
+            async with websockets.connect(self._get_ws_url(), ping_interval=None, open_timeout=60) as ws:
                 self._ws = ws
                 print("[DERIBIT-WS] Connected")
                 self._reconnect_attempts = 0

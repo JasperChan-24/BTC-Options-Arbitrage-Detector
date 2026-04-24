@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew install *)",
+      "Bash(python3 -c \"import subprocess; print\\('ok'\\)\")",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(python3 -m pip install pdfplumber)"
+    ]
+  }
+}
