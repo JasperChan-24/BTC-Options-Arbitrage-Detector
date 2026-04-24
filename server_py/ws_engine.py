@@ -185,27 +185,37 @@ class WsEngine:
         """Fetch all tradable BTC-USD option instrument IDs and subscribe."""
         print("[WS-ENGINE] Fetching instrument list for subscription...")
         inst_ids: List[str] = []
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                res = await client.get(
-                    "https://www.okx.com/api/v5/public/instruments?instType=OPTION&uly=BTC-USD"  # instruments API is same for paper trading
-                )
-                data = res.json()
-            if data.get("code") == "0" and data.get("data"):
-                # Strictly filter for Coin-margined (BTC-USD) options only.
-                # USDC-margined options have prices natively in USD. Multiplying them by spot 
-                # price causes a 65,000x inflation, creating $40M fake arbitrages!
-                # Filter to only include pure coin-margined options (ignore _UM / USDC options)
-                inst_ids = [
-                    i["instId"] 
-                    for i in data["data"] 
-                    if i["instId"].startswith("BTC-USD-") and "_UM" not in i["instId"]
-                ]
-        except Exception as e:
-            print(f"[WS-ENGINE] Failed to fetch instruments: {e}")
+
+        # Try multiple domains — www.okx.com may be DNS-blocked in some networks
+        api_urls = [
+            "https://www.okx.com/api/v5/public/instruments?instType=OPTION&uly=BTC-USD",
+            "https://aws.okx.com/api/v5/public/instruments?instType=OPTION&uly=BTC-USD",
+        ]
+        for api_url in api_urls:
+            if inst_ids:
+                break
+            try:
+                transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+                async with httpx.AsyncClient(transport=transport, timeout=10) as client:
+                    res = await client.get(api_url)
+                    data = res.json()
+                if data.get("code") == "0" and data.get("data"):
+                    # Strictly filter for Coin-margined (BTC-USD) options only.
+                    # USDC-margined options have prices natively in USD. Multiplying them by spot 
+                    # price causes a 65,000x inflation, creating $40M fake arbitrages!
+                    # Filter to only include pure coin-margined options (ignore _UM / USDC options)
+                    inst_ids = [
+                        i["instId"] 
+                        for i in data["data"] 
+                        if i["instId"].startswith("BTC-USD-") and "_UM" not in i["instId"]
+                    ]
+                    print(f"[WS-ENGINE] Fetched {len(inst_ids)} coin-margined instruments from {api_url.split('/')[2]}")
+            except Exception as e:
+                print(f"[WS-ENGINE] Failed to fetch instruments from {api_url.split('/')[2]}: {e}")
 
         if not inst_ids:
             print("[WS-ENGINE] No instruments found — falling back to instType subscription")
+            # Use 'uly' (not 'instFamily') — paper trading WS doesn't support instFamily
             await ws.send(
                 json.dumps(
                     {
@@ -214,7 +224,7 @@ class WsEngine:
                             {
                                 "channel": "tickers",
                                 "instType": "OPTION",
-                                "instFamily": "BTC-USD",
+                                "uly": "BTC-USD",
                             }
                         ],
                     }
