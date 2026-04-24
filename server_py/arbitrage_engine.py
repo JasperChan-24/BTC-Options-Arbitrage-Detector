@@ -299,6 +299,7 @@ class ArbitrageEngine:
             and o.spread_pct <= max_spread_pct
             and o.bid > 0
             and o.ask > 0
+            and o.bid < o.ask  # REJECT crossed books (negative spreads) which are common testnet API bugs
             and ((o.bidSize or 0) > 0 or (o.askSize or 0) > 0)
             and abs(o.strike - spot_price) / spot_price <= MAX_STRIKE_DEVIATION
         ]
