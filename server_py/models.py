@@ -96,8 +96,8 @@ class ArbitrageExecution(BaseModel):
 # ─── Engine Config ────────────────────────────────────────────────────────────
 
 class EngineConfig(BaseModel):
-    minVolume: int = 10
-    maxSpreadPct: int = 20
+    minVolume: int = 1
+    maxSpreadPct: int = 100
     includeFee: bool = True
     autoExecute: bool = False
     okxRiskPct: int = 25

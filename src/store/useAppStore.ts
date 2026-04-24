@@ -153,8 +153,8 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       // ── Settings defaults (with legacy migration) ───────────────────────
       filterEnabled: legacy.filterEnabled ?? true,
-      minVolume: legacy.minVolume ?? 10,
-      maxSpreadPct: legacy.maxSpreadPct ?? 20,
+      minVolume: legacy.minVolume ?? 1,
+      maxSpreadPct: legacy.maxSpreadPct ?? 100,
       selectedExchange: legacy.selectedExchange ?? 'okx',
       selectedEnvironment: legacy.selectedEnvironment ?? 'testnet',
       autoExecute: legacy.autoExecute ?? true,
