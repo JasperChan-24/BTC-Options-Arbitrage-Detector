@@ -192,20 +192,27 @@ class ArbitrageEngine:
                     import uuid
                     from datetime import datetime, timezone
                     now_iso = datetime.now(timezone.utc).isoformat()
-                    detected_orders = [
-                        SubmittedOrder(
-                            localId=f"det-{uuid.uuid4().hex[:6]}-{i}",
-                            instId=pos.instId,
-                            side=pos.action,
-                            type=pos.type,
-                            strike=pos.strike,
-                            sz=str(max(1, round(pos.amount))),
-                            px=f"{pos.rawPrice:.4f}",
-                            fillStatus="pending",  # not executed
-                            submittedAt=now_iso,
+                    detected_orders = []
+                    for i, pos in enumerate(result.portfolio):
+                        if market_id in ("okx", "okx_paper"):
+                            sz_contracts = pos.amount / 0.01
+                        else:
+                            sz_contracts = pos.amount / 1.0
+                        sz_str = str(max(1, round(sz_contracts)))
+                        
+                        detected_orders.append(
+                            SubmittedOrder(
+                                localId=f"det-{uuid.uuid4().hex[:6]}-{i}",
+                                instId=pos.instId,
+                                side=pos.action,
+                                type=pos.type,
+                                strike=pos.strike,
+                                sz=sz_str,
+                                px=f"{pos.rawPrice:.4f}",
+                                fillStatus="pending",  # not executed
+                                submittedAt=now_iso,
+                            )
                         )
-                        for i, pos in enumerate(result.portfolio)
-                    ]
                     detection = ArbitrageExecution(
                         execId=str(uuid.uuid4())[:8],
                         exchange=exchange,
@@ -471,7 +478,14 @@ class ArbitrageEngine:
                 px_str = f"{pos.rawPrice:.4f}"
                 if px_str == "0.0000":
                     continue  # Skip legs with effectively zero price
-                sz = min(max(1, round(pos.amount)), MAX_SZ)
+                    
+                # Convert BTC amount to contract count
+                if is_okx:
+                    sz_contracts = pos.amount / 0.01
+                else:
+                    sz_contracts = pos.amount / 1.0
+                    
+                sz = min(max(1, round(sz_contracts)), MAX_SZ)
                 orders.append(
                     OrderRequest(
                         instId=pos.instId,
@@ -511,6 +525,14 @@ class ArbitrageEngine:
             for i, pos in enumerate(priced_portfolio):
                 r = exec_result.results[i] if i < len(exec_result.results) else None
                 ok = r is not None and r.sCode == "0"
+                
+                # Convert BTC amount to contract count
+                if is_okx:
+                    sz_contracts = pos.amount / 0.01
+                else:
+                    sz_contracts = pos.amount / 1.0
+                sz_str = str(min(max(1, round(sz_contracts)), MAX_SZ))
+                
                 submitted_orders.append(
                     SubmittedOrder(
                         localId=f"{int(time.time() * 1000)}-{i}",
@@ -518,7 +540,7 @@ class ArbitrageEngine:
                         side=pos.action,
                         type=pos.type,
                         strike=pos.strike,
-                        sz=str(max(1, round(pos.amount))),
+                        sz=sz_str,
                         px=f"{pos.rawPrice:.4f}",
                         ordId=r.ordId if ok and r else None,
                         fillStatus="live" if ok else "failed",

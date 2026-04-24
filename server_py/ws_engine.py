@@ -195,10 +195,11 @@ class WsEngine:
                 # Strictly filter for Coin-margined (BTC-USD) options only.
                 # USDC-margined options have prices natively in USD. Multiplying them by spot 
                 # price causes a 65,000x inflation, creating $40M fake arbitrages!
+                # Filter to only include pure coin-margined options (ignore _UM / USDC options)
                 inst_ids = [
                     i["instId"] 
                     for i in data["data"] 
-                    if i.get("instFamily") == "BTC-USD" or i["instId"].startswith("BTC-USD-")
+                    if i["instId"].startswith("BTC-USD-") and "_UM" not in i["instId"]
                 ]
         except Exception as e:
             print(f"[WS-ENGINE] Failed to fetch instruments: {e}")
@@ -303,9 +304,14 @@ class WsEngine:
             ask = raw_ask * sp if sp > 0 else raw_ask
             spread_pct = ((ask - bid) / ask) * 100 if ask > 0 else 0
             
-            vol = float(item.get("vol24h", "0") or "0")
-            bid_sz = float(item.get("bidSz", "0") or "0")
-            ask_sz = float(item.get("askSz", "0") or "0")
+            vol_contracts = float(item.get("vol24h", "0") or "0")
+            bid_sz_contracts = float(item.get("bidSz", "0") or "0")
+            ask_sz_contracts = float(item.get("askSz", "0") or "0")
+
+            # Normalize to BTC exposure (1 OKX BTC option contract = 0.01 BTC)
+            vol_btc = vol_contracts * 0.01
+            bid_sz_btc = bid_sz_contracts * 0.01
+            ask_sz_btc = ask_sz_contracts * 0.01
 
             results.append(
                 OptionData(
@@ -315,12 +321,12 @@ class WsEngine:
                     type=parsed["type"],
                     bid=bid,
                     ask=ask,
-                    volume=vol,
+                    volume=vol_btc,
                     underlying_price=sp,
                     spread_pct=spread_pct,
                     exchange="okx",
-                    bidSize=bid_sz,
-                    askSize=ask_sz,
+                    bidSize=bid_sz_btc,
+                    askSize=ask_sz_btc,
                 )
             )
             cached_dump.append({
