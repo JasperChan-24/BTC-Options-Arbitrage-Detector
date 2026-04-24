@@ -141,10 +141,12 @@ class WsEngine:
                 self._set_status("error")
             if self._destroyed:
                 break
-            # Exponential backoff
+            # Exponential backoff, but start fast
             delay = min(2 ** self._reconnect_attempts, MAX_RECONNECT_DELAY)
+            if self._reconnect_attempts == 0:
+                delay = 1  # First retry is fast
             self._reconnect_attempts += 1
-            self._ticker_map.clear()
+            # Keep ticker_map — show stale data rather than empty screen
             self._dirty = False
             print(f"[WS-ENGINE] Reconnecting in {delay}s (attempt {self._reconnect_attempts})")
             self._set_status("disconnected")
