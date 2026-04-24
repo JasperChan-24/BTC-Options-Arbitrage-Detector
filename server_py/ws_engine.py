@@ -337,7 +337,8 @@ class WsEngine:
     # ─── Spot price ───────────────────────────────────────────────────────
 
     async def _fetch_spot_loop(self) -> None:
-        self._http_client = httpx.AsyncClient(timeout=30)
+        transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+        self._http_client = httpx.AsyncClient(transport=transport, timeout=30)
         try:
             while not self._destroyed:
                 fetched = False
