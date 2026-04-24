@@ -172,8 +172,24 @@ class ArbitrageEngine:
 
         self._latest_options[market_id] = options  # cache for budget LP re-solve
         
-        # Offload CPU-heavy LP solving to a background thread
-        scan = await asyncio.to_thread(self._scan_all_expiries, options, exchange, market_id)
+        # ── Prevent CPU starvation on slow servers (AWS Lightsail) ────────
+        # If the LP solver takes longer than 500ms, threads will pile up and 
+        # crash the asyncio event loop. We must enforce 1 scan at a time.
+        if not hasattr(self, "_active_scans"):
+            self._active_scans = set()
+            
+        if market_id in self._active_scans:
+            # Skip LP solving this tick, but we still want to broadcast options?
+            # Actually, WsEngine already broadcasts options independently via _make_okx_on_update
+            return
+            
+        self._active_scans.add(market_id)
+        
+        try:
+            # Offload CPU-heavy LP solving to a background thread
+            scan = await asyncio.to_thread(self._scan_all_expiries, options, exchange, market_id)
+        finally:
+            self._active_scans.remove(market_id)
         
         result = scan["result"]
         expiry = scan["expiry"]
