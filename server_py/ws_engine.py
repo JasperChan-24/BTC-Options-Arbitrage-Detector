@@ -192,7 +192,14 @@ class WsEngine:
                 )
                 data = res.json()
             if data.get("code") == "0" and data.get("data"):
-                inst_ids = [i["instId"] for i in data["data"]]
+                # Strictly filter for Coin-margined (BTC-USD) options only.
+                # USDC-margined options have prices natively in USD. Multiplying them by spot 
+                # price causes a 65,000x inflation, creating $40M fake arbitrages!
+                inst_ids = [
+                    i["instId"] 
+                    for i in data["data"] 
+                    if i.get("instFamily") == "BTC-USD" or i["instId"].startswith("BTC-USD-")
+                ]
         except Exception as e:
             print(f"[WS-ENGINE] Failed to fetch instruments: {e}")
 
