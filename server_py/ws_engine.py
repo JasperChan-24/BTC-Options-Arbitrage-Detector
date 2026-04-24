@@ -195,12 +195,11 @@ class WsEngine:
                 # Strictly filter for Coin-margined (BTC-USD) options only.
                 # USDC-margined options have prices natively in USD. Multiplying them by spot 
                 # price causes a 65,000x inflation, creating $40M fake arbitrages!
-                # Re-allow _UM options so testnet has data, but we will handle their USD pricing 
-                # correctly in _build_options_array to avoid 65,000x inflation.
+                # Filter to only include pure coin-margined options (ignore _UM / USDC options)
                 inst_ids = [
                     i["instId"] 
                     for i in data["data"] 
-                    if i["instId"].startswith("BTC-USD-") or "BTC-USD_UM" in i["instId"]
+                    if i["instId"].startswith("BTC-USD-") and "_UM" not in i["instId"]
                 ]
         except Exception as e:
             print(f"[WS-ENGINE] Failed to fetch instruments: {e}")
@@ -301,11 +300,8 @@ class WsEngine:
                 continue
             if not raw_bid or not raw_ask:
                 continue
-            # _UM or USDC-margined options are already priced in USD, do not multiply by sp!
-            is_usd_priced = "_UM" in item["instId"] or "-USDC-" in item["instId"] or "-USDT-" in item["instId"]
-            
-            bid = raw_bid if is_usd_priced else (raw_bid * sp if sp > 0 else raw_bid)
-            ask = raw_ask if is_usd_priced else (raw_ask * sp if sp > 0 else raw_ask)
+            bid = raw_bid * sp if sp > 0 else raw_bid
+            ask = raw_ask * sp if sp > 0 else raw_ask
             spread_pct = ((ask - bid) / ask) * 100 if ask > 0 else 0
             
             vol_contracts = float(item.get("vol24h", "0") or "0")
