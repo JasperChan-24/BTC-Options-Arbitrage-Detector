@@ -168,6 +168,7 @@ def detect_arbitrage(
             )
             raw_bid_btc = (
                 opt.bid / opt.underlying_price if opt.underlying_price > 0 else opt.bid
+            )
             A_ub[row, 2 * i]     = raw_ask_btc       # buy cost (x_i is BTC exposure)
             A_ub[row, 2 * i + 1] = raw_bid_btc * SELL_MARGIN_MULT  # sell margin
         b_ub[row] = budget_btc
