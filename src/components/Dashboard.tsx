@@ -83,6 +83,15 @@ export default function Dashboard({ lang, onLanguageChange }: { lang: Language; 
   // Sync SSE → Zustand store
   useEffect(() => { setHasCredentials(hasCredentials); }, [hasCredentials, setHasCredentials]);
 
+  // Sync selectedExchange to match backend's active exchange on SSE connect
+  // This ensures the data filter doesn't reject options from the snapshot
+  useEffect(() => {
+    if (wsEnabled && backendActiveExchange && backendActiveExchange !== selectedExchange) {
+      useAppStore.getState().setSelectedExchange(backendActiveExchange as any);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendActiveExchange, wsEnabled]);
+
   // Sync SSE arb results — but NEVER when frontend LP is active (demo mode)
   useEffect(() => {
     if (wsEnabled && sseArbResult && !needsFrontendLPRef.current) {

@@ -11,6 +11,9 @@ services:
       - "3001:3001"
     env_file:
       - .env  # API keys are in the root .env file
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     volumes:
       - ./data:/app/data  # Persist JSONL execution history (Sync with root data folder)
     networks:

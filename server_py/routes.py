@@ -47,7 +47,16 @@ def create_routes(
         # Send current state as 'snapshot'
         _okx = get_okx_ws()
         _drb = get_deribit_ws()
-        options = _okx.get_options_snapshot()
+        active_ex = engine.get_active_exchange()
+
+        # Send options for the ACTIVE exchange (not always OKX)
+        if active_ex == "okx":
+            options = _okx.get_options_snapshot()
+            spot = _okx.current_spot_price
+        else:
+            options = _drb.get_options_snapshot()
+            spot = _drb.current_spot_price
+
         last_arb = engine.get_last_arb()
 
         sse.send_to(
@@ -55,16 +64,17 @@ def create_routes(
             "snapshot",
             {
                 "options": [o.model_dump() for o in options],
+                "spotPrice": spot,
                 "arbitrage": {
                     "result": last_arb["result"].model_dump(),
                     "expiry": last_arb["expiry"],
                 },
                 "config": engine.get_config(),
                 "wsStatus": _okx.status,
-                "tickerCount": _okx.ticker_count,
+                "tickerCount": _okx.ticker_count if active_ex == "okx" else _drb.ticker_count,
                 "executions": [e.model_dump() for e in store.get_recent(30)],
                 "hasCredentials": engine.get_credentials() is not None,
-                "activeExchange": engine.get_active_exchange(),
+                "activeExchange": active_ex,
                 # Deribit info
                 "deribitWsStatus": _drb.status,
                 "deribitTickerCount": _drb.ticker_count,

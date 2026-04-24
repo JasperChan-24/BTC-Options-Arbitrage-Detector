@@ -6,6 +6,7 @@ Direct translation of server/tradingService.ts.
 """
 
 from __future__ import annotations
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -23,6 +24,22 @@ from .models import (
 )
 
 BASE = "https://www.okx.com"
+
+# ─── Persistent HTTP client (connection pooling for Docker environments) ──────
+_http_client: Optional[httpx.AsyncClient] = None
+_HTTP_TIMEOUT = httpx.Timeout(30.0, connect=15.0)  # generous timeouts for Docker DNS
+_MAX_RETRIES = 2
+
+
+def _get_client() -> httpx.AsyncClient:
+    """Get or create a persistent HTTP client with connection pooling."""
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(
+            timeout=_HTTP_TIMEOUT,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
+        )
+    return _http_client
 
 
 # ─── HMAC-SHA256 signing ─────────────────────────────────────────────────────
@@ -64,9 +81,9 @@ async def test_connection(
     path = "/api/v5/account/config"
     try:
         headers = _build_headers(creds, "GET", path)
-        async with httpx.AsyncClient(timeout=10) as client:
-            res = await client.get(BASE + path, headers=headers)
-            data = res.json()
+        client = _get_client()
+        res = await client.get(BASE + path, headers=headers)
+        data = res.json()
         if data.get("code") == "0":
             return {"ok": True}
         return {"ok": False, "error": f"{data.get('code')}: {data.get('msg')}"}
@@ -82,9 +99,9 @@ async def fetch_tradable_inst_ids(simulated: bool = False) -> Set[str]:
         headers: dict[str, str] = {}
         if simulated:
             headers["x-simulated-trading"] = "1"
-        async with httpx.AsyncClient(timeout=10) as client:
-            res = await client.get(url, headers=headers)
-            data = res.json()
+        client = _get_client()
+        res = await client.get(url, headers=headers)
+        data = res.json()
         if data.get("code") != "0":
             return set()
         return {item["instId"] for item in (data.get("data") or [])}
@@ -100,9 +117,9 @@ async def fetch_account_balance(
     path = "/api/v5/account/balance"
     try:
         headers = _build_headers(creds, "GET", path)
-        async with httpx.AsyncClient(timeout=10) as client:
-            res = await client.get(BASE + path, headers=headers)
-            data = res.json()
+        client = _get_client()
+        res = await client.get(BASE + path, headers=headers)
+        data = res.json()
         if data.get("code") != "0" or not data.get("data", [None])[0]:
             return None
 
@@ -161,9 +178,24 @@ async def place_arbitrage_orders(
     print(f"[TRADING] Placing batch orders: {payload}")
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            res = await client.post(BASE + path, headers=headers, content=body)
-            data = res.json()
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                client = _get_client()
+                res = await client.post(BASE + path, headers=headers, content=body)
+                data = res.json()
+                break  # success
+            except Exception as e:
+                if attempt < _MAX_RETRIES:
+                    wait = 1.0 * (attempt + 1)
+                    print(f"[TRADING] OKX attempt {attempt + 1} failed: {e}, retrying in {wait}s...")
+                    await asyncio.sleep(wait)
+                    # Reset client on connection errors
+                    global _http_client
+                    if _http_client and not _http_client.is_closed:
+                        await _http_client.aclose()
+                    _http_client = None
+                else:
+                    raise
 
         print(f"[TRADING] Response (HTTP {res.status_code}): {_json.dumps(data, indent=2)}")
 
@@ -216,9 +248,9 @@ async def fetch_order_status(
     path = f"/api/v5/trade/order?instId={quote(inst_id)}&ordId={quote(ord_id)}"
     try:
         headers = _build_headers(creds, "GET", path)
-        async with httpx.AsyncClient(timeout=10) as client:
-            res = await client.get(BASE + path, headers=headers)
-            data = res.json()
+        client = _get_client()
+        res = await client.get(BASE + path, headers=headers)
+        data = res.json()
         if data.get("code") != "0" or not data.get("data", [None])[0]:
             return None
         return data["data"][0]

@@ -6,6 +6,7 @@ Direct translation of server/deribitTradingService.ts.
 """
 
 from __future__ import annotations
+import asyncio
 import time
 from typing import Optional, Set
 from urllib.parse import urlencode
@@ -19,6 +20,22 @@ from .models import (
     PlaceOrdersResult,
     AccountBalance,
 )
+
+# ─── Persistent HTTP client (connection pooling for Docker environments) ──────
+_http_client: Optional[httpx.AsyncClient] = None
+_HTTP_TIMEOUT = httpx.Timeout(30.0, connect=15.0)  # generous timeouts for Docker DNS
+_MAX_RETRIES = 2
+
+
+def _get_client() -> httpx.AsyncClient:
+    """Get or create a persistent HTTP client with connection pooling."""
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(
+            timeout=_HTTP_TIMEOUT,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
+        )
+    return _http_client
 
 
 def _base_url(testnet: bool) -> str:
@@ -50,23 +67,34 @@ async def _authenticate(
         f"&client_id={creds.clientId}"
         f"&client_secret={creds.clientSecret}"
     )
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            client = _get_client()
             res = await client.get(url)
             data = res.json()
-        if data.get("error"):
-            err = data["error"]
-            return {"ok": False, "error": f"[{err.get('code')}] {err.get('message')}"}
+            if data.get("error"):
+                err = data["error"]
+                return {"ok": False, "error": f"[{err.get('code')}] {err.get('message')}"}
 
-        result = data["result"]
-        _cached_token = {
-            "token": result["access_token"],
-            "expires_at": time.time() + result["expires_in"],
-            "key": cache_key,
-        }
-        return {"ok": True, "token": result["access_token"]}
-    except Exception as e:
-        return {"ok": False, "error": str(e) or "Network error"}
+            result = data["result"]
+            _cached_token = {
+                "token": result["access_token"],
+                "expires_at": time.time() + result["expires_in"],
+                "key": cache_key,
+            }
+            return {"ok": True, "token": result["access_token"]}
+        except Exception as e:
+            if attempt < _MAX_RETRIES:
+                wait = 1.0 * (attempt + 1)
+                print(f"[DERIBIT] Auth attempt {attempt + 1} failed: {e}, retrying in {wait}s...")
+                await asyncio.sleep(wait)
+                # Reset client on connection errors
+                global _http_client
+                if _http_client and not _http_client.is_closed:
+                    await _http_client.aclose()
+                _http_client = None
+            else:
+                return {"ok": False, "error": str(e) or "Network error"}
 
 
 async def _authed_fetch(
@@ -82,9 +110,9 @@ async def _authed_fetch(
     qs = "?" + urlencode(params) if params else ""
     url = f"{base}{path}{qs}"
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        res = await client.get(url, headers={"Authorization": f"Bearer {auth['token']}"})
-        data = res.json()
+    client = _get_client()
+    res = await client.get(url, headers={"Authorization": f"Bearer {auth['token']}"})
+    data = res.json()
 
     if data.get("error"):
         err = data["error"]
@@ -118,11 +146,11 @@ async def fetch_account_balance(
         spot_price = 0.0
         try:
             base = _base_url(creds.testnet)
-            async with httpx.AsyncClient(timeout=10) as client:
-                ticker_res = await client.get(
-                    f"{base}/api/v2/public/ticker?instrument_name=BTC-PERPETUAL"
-                )
-                ticker_data = ticker_res.json()
+            client = _get_client()
+            ticker_res = await client.get(
+                f"{base}/api/v2/public/ticker?instrument_name=BTC-PERPETUAL"
+            )
+            ticker_data = ticker_res.json()
             spot_price = ticker_data.get("result", {}).get("last_price", 0)
         except Exception:
             pass
@@ -143,9 +171,9 @@ async def fetch_tradable_inst_ids(testnet: bool) -> Set[str]:
     try:
         base = _base_url(testnet)
         url = f"{base}/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false"
-        async with httpx.AsyncClient(timeout=10) as client:
-            res = await client.get(url)
-            data = res.json()
+        client = _get_client()
+        res = await client.get(url)
+        data = res.json()
         if data.get("error") or not data.get("result"):
             return set()
         return {i["instrument_name"] for i in data["result"]}
@@ -160,34 +188,46 @@ async def _place_single_order(
     order: OrderRequest,
 ) -> OrderResult:
     endpoint = "/api/v2/private/buy" if order.side == "buy" else "/api/v2/private/sell"
-    try:
-        result = await _authed_fetch(
-            creds,
-            endpoint,
-            {
-                "instrument_name": order.instId,
-                "amount": order.sz,
-                "type": "limit",
-                "price": order.px,
-                "time_in_force": "immediate_or_cancel",
-            },
-        )
-        o = result.get("order", {})
-        return OrderResult(
-            instId=order.instId,
-            clOrdId=o.get("label", ""),
-            ordId=o.get("order_id", ""),
-            sCode="0",
-            sMsg="ok",
-        )
-    except Exception as e:
-        return OrderResult(
-            instId=order.instId,
-            clOrdId="",
-            ordId="",
-            sCode="ERR",
-            sMsg=str(e) or "Failed",
-        )
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            result = await _authed_fetch(
+                creds,
+                endpoint,
+                {
+                    "instrument_name": order.instId,
+                    "amount": order.sz,
+                    "type": "limit",
+                    "price": order.px,
+                    "time_in_force": "immediate_or_cancel",
+                },
+            )
+            o = result.get("order", {})
+            return OrderResult(
+                instId=order.instId,
+                clOrdId=o.get("label", ""),
+                ordId=o.get("order_id", ""),
+                sCode="0",
+                sMsg="ok",
+            )
+        except Exception as e:
+            err_str = str(e) or "Failed"
+            # Only retry on network/connection errors, not API errors
+            is_network_err = any(kw in err_str.lower() for kw in (
+                "network", "connect", "timeout", "dns", "resolve", "reset",
+                "closed", "eof", "connection",
+            ))
+            if is_network_err and attempt < _MAX_RETRIES:
+                wait = 1.0 * (attempt + 1)
+                print(f"[DERIBIT] Order {order.instId} attempt {attempt + 1} failed: {e}, retrying in {wait}s...")
+                await asyncio.sleep(wait)
+                continue
+            return OrderResult(
+                instId=order.instId,
+                clOrdId="",
+                ordId="",
+                sCode="ERR",
+                sMsg=err_str,
+            )
 
 
 async def place_arbitrage_orders(
