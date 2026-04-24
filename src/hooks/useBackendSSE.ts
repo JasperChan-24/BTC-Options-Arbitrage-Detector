@@ -97,7 +97,6 @@ export function useBackendSSE(enabled: boolean): BackendState {
         case 'snapshot':
           // Initial state dump from server — only time we get full options
           if (data.options) setOptions(data.options);
-          if (data.spotPrice) setSpotPrice(data.spotPrice);
           if (data.arbitrage) {
             setArbResult(data.arbitrage.result ?? EMPTY_ARB);
             setArbExpiry(data.arbitrage.expiry ?? '');

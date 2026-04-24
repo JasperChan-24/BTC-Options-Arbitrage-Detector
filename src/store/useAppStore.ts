@@ -258,6 +258,8 @@ export const useAppStore = create<AppState>()(
       // ── Derived helpers ─────────────────────────────────────────────────
       effectiveMinVolume: () => {
         const s = get();
+        // Testnet markets have virtually no organic volume, always bypass filter
+        if (s.selectedEnvironment === 'testnet') return 0;
         return s.filterEnabled ? s.minVolume : 0;
       },
       effectiveMaxSpreadPct: () => {

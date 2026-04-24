@@ -83,7 +83,7 @@ def _make_okx_on_update(market_id: str, ws_ref):
                 now = _time.time()
                 if now - _last_options_broadcast.get(market_id, 0) >= OPTIONS_BROADCAST_INTERVAL:
                     _last_options_broadcast[market_id] = now
-                    ticker_data["options"] = [o.model_dump() for o in options]
+                    ticker_data["options"] = ws_ref().get_options_snapshot_dump()
 
                 sse.broadcast("ticker", ticker_data)
             
@@ -120,7 +120,7 @@ def _make_deribit_on_update(market_id: str, ws_ref):
                 now = _time.time()
                 if now - _last_options_broadcast.get(market_id, 0) >= OPTIONS_BROADCAST_INTERVAL:
                     _last_options_broadcast[market_id] = now
-                    ticker_data["options"] = [o.model_dump() for o in options]
+                    ticker_data["options"] = ws_ref().get_options_snapshot_dump()
 
                 sse.broadcast("deribit_ticker", ticker_data)
             
@@ -223,15 +223,15 @@ def switch_environment(new_env: str) -> dict:
 
         # Push options snapshot
         ws = new_pair[ex]
-        snapshot = ws.get_options_snapshot()
-        if snapshot:
+        options_dump = ws.get_options_snapshot_dump()
+        if options_dump:
             event = "ticker" if ex == "okx" else "deribit_ticker"
             sse.broadcast(event, {
-                "count": len(snapshot),
+                "count": len(options_dump),
                 "spotPrice": ws.current_spot_price,
                 "wsStatus": ws.status,
                 "market": mid,
-                "options": [o.model_dump() for o in snapshot],
+                "options": options_dump,
             })
 
     # Reset options broadcast timestamps so next tick sends options immediately

@@ -90,6 +90,7 @@ class DeribitWsEngine:
         self._reconnect_attempts: int = 0
         self._destroyed: bool = False
         self._rpc_id: int = 0
+        self._cached_options_dump: List[dict] = []
 
         # Background tasks
         self._heartbeat_task: Optional[asyncio.Task] = None
@@ -120,6 +121,13 @@ class DeribitWsEngine:
         return self._spot_price
 
     # ─── Public API ───────────────────────────────────────────────────────
+
+    def get_options_snapshot_dump(self) -> List[dict]:
+        """Return the pre-serialized dictionary list for SSE broadcast."""
+        return self._cached_options_dump
+
+    def get_options_snapshot(self) -> List[OptionData]:
+        return self._build_options_array()
 
     def connect(self) -> None:
         if self._destroyed:
@@ -289,6 +297,7 @@ class DeribitWsEngine:
 
     def _build_options_array(self) -> List[OptionData]:
         results: List[OptionData] = []
+        cached_dump: List[dict] = []
         sp = self._spot_price
 
         for inst_name, data in self._ticker_map.items():
@@ -311,6 +320,10 @@ class DeribitWsEngine:
             if isinstance(stats, dict):
                 stats_volume = stats.get("volume", 0) or 0
 
+            vol = stats_volume * 100
+            bid_sz = data.get("best_bid_amount", 0) or 0
+            ask_sz = data.get("best_ask_amount", 0) or 0
+
             results.append(
                 OptionData(
                     instrument_name=inst_name,
@@ -319,14 +332,30 @@ class DeribitWsEngine:
                     type=parsed["type"],
                     bid=bid,
                     ask=ask,
-                    volume=stats_volume * 100,  # Convert to OKX-equivalent contracts
+                    volume=vol,  # Convert to OKX-equivalent contracts
                     underlying_price=underlying_price,
                     spread_pct=spread_pct,
                     exchange="deribit",
-                    bidSize=data.get("best_bid_amount", 0) or 0,
-                    askSize=data.get("best_ask_amount", 0) or 0,
+                    bidSize=bid_sz,
+                    askSize=ask_sz,
                 )
             )
+            cached_dump.append({
+                "instrument_name": inst_name,
+                "strike": parsed["strike"],
+                "expiration": parsed["expiration"],
+                "type": parsed["type"],
+                "bid": bid,
+                "ask": ask,
+                "volume": vol,
+                "underlying_price": underlying_price,
+                "spread_pct": spread_pct,
+                "exchange": "deribit",
+                "bidSize": bid_sz,
+                "askSize": ask_sz,
+            })
+            
+        self._cached_options_dump = cached_dump
         return results
 
     # ─── Spot price ───────────────────────────────────────────────────────

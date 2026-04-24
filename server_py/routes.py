@@ -51,10 +51,10 @@ def create_routes(
 
         # Send options for the ACTIVE exchange (not always OKX)
         if active_ex == "okx":
-            options = _okx.get_options_snapshot()
+            options_dump = _okx.get_options_snapshot_dump()
             spot = _okx.current_spot_price
         else:
-            options = _drb.get_options_snapshot()
+            options_dump = _drb.get_options_snapshot_dump()
             spot = _drb.current_spot_price
 
         last_arb = engine.get_last_arb()
@@ -63,7 +63,7 @@ def create_routes(
             client_id,
             "snapshot",
             {
-                "options": [o.model_dump() for o in options],
+                "options": options_dump,
                 "spotPrice": spot,
                 "arbitrage": {
                     "result": last_arb["result"].model_dump(),
@@ -137,15 +137,15 @@ def create_routes(
         # Heavy work (options snapshot broadcast) in background
         def _push_options():
             ws = get_okx_ws() if exchange == "okx" else get_deribit_ws()
-            new_options = ws.get_options_snapshot()
-            if new_options:
+            options_dump = ws.get_options_snapshot_dump()
+            if options_dump:
                 event = "ticker" if exchange == "okx" else "deribit_ticker"
                 sse.broadcast(event, {
-                    "count": len(new_options),
+                    "count": len(options_dump),
                     "spotPrice": ws.current_spot_price,
                     "wsStatus": ws.status,
                     "market": exchange,
-                    "options": [o.model_dump() for o in new_options],
+                    "options": options_dump,
                 })
 
         from starlette.background import BackgroundTask

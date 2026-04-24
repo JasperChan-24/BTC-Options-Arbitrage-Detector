@@ -83,15 +83,6 @@ export default function Dashboard({ lang, onLanguageChange }: { lang: Language; 
   // Sync SSE → Zustand store
   useEffect(() => { setHasCredentials(hasCredentials); }, [hasCredentials, setHasCredentials]);
 
-  // Sync selectedExchange to match backend's active exchange on SSE connect
-  // This ensures the data filter doesn't reject options from the snapshot
-  useEffect(() => {
-    if (wsEnabled && backendActiveExchange && backendActiveExchange !== selectedExchange) {
-      useAppStore.getState().setSelectedExchange(backendActiveExchange as any);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backendActiveExchange, wsEnabled]);
-
   // Sync SSE arb results — but NEVER when frontend LP is active (demo mode)
   useEffect(() => {
     if (wsEnabled && sseArbResult && !needsFrontendLPRef.current) {
@@ -238,7 +229,8 @@ export default function Dashboard({ lang, onLanguageChange }: { lang: Language; 
     const strikes = bestArbResult.portfolio.map((p) => p.strike);
     const minStrike = Math.min(...strikes);
     const maxStrike = Math.max(...strikes);
-    const step = (maxStrike - minStrike) / 50;
+    // Prevent infinite loop if minStrike == maxStrike (step = 0)
+    const step = Math.max((maxStrike - minStrike) / 50, 100);
 
     let initialProfit = 0;
     bestArbResult.portfolio.forEach((pos) => {
