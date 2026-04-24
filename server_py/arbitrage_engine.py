@@ -276,6 +276,11 @@ class ArbitrageEngine:
             else self._config.deribitBudgetBtc
         )
 
+        # Safety circuit breaker: if spot price failed to load, DO NOT run arbitrage 
+        # (Otherwise BTC-denominated prices are treated as USD, causing 42 million dollar fake profits)
+        if not options or options[0].underlying_price <= 0:
+            return {"result": ArbitrageResult(feasible=False, profit=0.0, portfolio=[]), "expiry": ""}
+
         # Testnet/paper markets have very low volume — bypass volume filter
         is_testnet = market_id in TEST_MARKETS if market_id else False
         min_volume = 0 if is_testnet else self._config.minVolume
