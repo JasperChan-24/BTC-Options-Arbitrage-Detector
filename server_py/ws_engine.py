@@ -336,12 +336,12 @@ class WsEngine:
                 "type": parsed["type"],
                 "bid": bid,
                 "ask": ask,
-                "volume": vol,
+                "volume": vol_btc,
                 "underlying_price": sp,
                 "spread_pct": spread_pct,
                 "exchange": "okx",
-                "bidSize": bid_sz,
-                "askSize": ask_sz,
+                "bidSize": bid_sz_btc,
+                "askSize": ask_sz_btc,
             })
             
         self._cached_options_dump = cached_dump
