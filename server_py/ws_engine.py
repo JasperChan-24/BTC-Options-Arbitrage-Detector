@@ -185,37 +185,28 @@ class WsEngine:
         """Fetch all tradable BTC-USD option instrument IDs and subscribe."""
         print("[WS-ENGINE] Fetching instrument list for subscription...")
         inst_ids: List[str] = []
-
-        # Try multiple domains — www.okx.com may be DNS-blocked in some networks
-        api_urls = [
-            "https://www.okx.com/api/v5/public/instruments?instType=OPTION&uly=BTC-USD",
-            "https://aws.okx.com/api/v5/public/instruments?instType=OPTION&uly=BTC-USD",
-        ]
-        for api_url in api_urls:
-            if inst_ids:
-                break
-            try:
-                transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
-                async with httpx.AsyncClient(transport=transport, timeout=10) as client:
-                    res = await client.get(api_url)
-                    data = res.json()
-                if data.get("code") == "0" and data.get("data"):
-                    # Strictly filter for Coin-margined (BTC-USD) options only.
-                    # USDC-margined options have prices natively in USD. Multiplying them by spot 
-                    # price causes a 65,000x inflation, creating $40M fake arbitrages!
-                    # Filter to only include pure coin-margined options (ignore _UM / USDC options)
-                    inst_ids = [
-                        i["instId"] 
-                        for i in data["data"] 
-                        if i["instId"].startswith("BTC-USD-") and "_UM" not in i["instId"]
-                    ]
-                    print(f"[WS-ENGINE] Fetched {len(inst_ids)} coin-margined instruments from {api_url.split('/')[2]}")
-            except Exception as e:
-                print(f"[WS-ENGINE] Failed to fetch instruments from {api_url.split('/')[2]}: {e}")
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                res = await client.get(
+                    "https://www.okx.com/api/v5/public/instruments?instType=OPTION&uly=BTC-USD"  # instruments API is same for paper trading
+                )
+                data = res.json()
+            if data.get("code") == "0" and data.get("data"):
+                # Strictly filter for Coin-margined (BTC-USD) options only.
+                # USDC-margined options have prices natively in USD. Multiplying them by spot 
+                # price causes a 65,000x inflation, creating $40M fake arbitrages!
+                # Re-allow _UM options so testnet has data, but we will handle their USD pricing 
+                # correctly in _build_options_array to avoid 65,000x inflation.
+                inst_ids = [
+                    i["instId"] 
+                    for i in data["data"] 
+                    if i["instId"].startswith("BTC-USD-") or "BTC-USD_UM" in i["instId"]
+                ]
+        except Exception as e:
+            print(f"[WS-ENGINE] Failed to fetch instruments: {e}")
 
         if not inst_ids:
             print("[WS-ENGINE] No instruments found — falling back to instType subscription")
-            # Use 'uly' (not 'instFamily') — paper trading WS doesn't support instFamily
             await ws.send(
                 json.dumps(
                     {
@@ -224,7 +215,7 @@ class WsEngine:
                             {
                                 "channel": "tickers",
                                 "instType": "OPTION",
-                                "uly": "BTC-USD",
+                                "instFamily": "BTC-USD",
                             }
                         ],
                     }
@@ -310,8 +301,11 @@ class WsEngine:
                 continue
             if not raw_bid or not raw_ask:
                 continue
-            bid = raw_bid * sp if sp > 0 else raw_bid
-            ask = raw_ask * sp if sp > 0 else raw_ask
+            # _UM or USDC-margined options are already priced in USD, do not multiply by sp!
+            is_usd_priced = "_UM" in item["instId"] or "-USDC-" in item["instId"] or "-USDT-" in item["instId"]
+            
+            bid = raw_bid if is_usd_priced else (raw_bid * sp if sp > 0 else raw_bid)
+            ask = raw_ask if is_usd_priced else (raw_ask * sp if sp > 0 else raw_ask)
             spread_pct = ((ask - bid) / ask) * 100 if ask > 0 else 0
             
             vol_contracts = float(item.get("vol24h", "0") or "0")
