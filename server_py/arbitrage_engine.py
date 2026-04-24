@@ -172,24 +172,8 @@ class ArbitrageEngine:
 
         self._latest_options[market_id] = options  # cache for budget LP re-solve
         
-        # ── Prevent CPU starvation on slow servers (AWS Lightsail) ────────
-        # If the LP solver takes longer than 500ms, threads will pile up and 
-        # crash the asyncio event loop. We must enforce 1 scan at a time.
-        if not hasattr(self, "_active_scans"):
-            self._active_scans = set()
-            
-        if market_id in self._active_scans:
-            # Skip LP solving this tick, but we still want to broadcast options?
-            # Actually, WsEngine already broadcasts options independently via _make_okx_on_update
-            return
-            
-        self._active_scans.add(market_id)
-        
-        try:
-            # Offload CPU-heavy LP solving to a background thread
-            scan = await asyncio.to_thread(self._scan_all_expiries, options, exchange, market_id)
-        finally:
-            self._active_scans.remove(market_id)
+        # Offload CPU-heavy LP solving to a background thread
+        scan = await asyncio.to_thread(self._scan_all_expiries, options, exchange, market_id)
         
         result = scan["result"]
         expiry = scan["expiry"]
@@ -301,6 +285,13 @@ class ArbitrageEngine:
         is_testnet = market_id in TEST_MARKETS if market_id else False
         min_volume = 0 if is_testnet else self._config.minVolume
 
+        # Extract spot price (already validated > 0 by circuit breaker above)
+        spot_price = options[0].underlying_price
+
+        # The mathematical LP matrix grows exponentially. Deep OTM/ITM options rarely have 
+        # actionable arbitrage and choke the CPU. We filter to only scan options within ±15% of spot.
+        MAX_STRIKE_DEVIATION = 0.15
+
         filtered = [
             o
             for o in options
@@ -309,6 +300,7 @@ class ArbitrageEngine:
             and o.bid > 0
             and o.ask > 0
             and ((o.bidSize or 0) > 0 or (o.askSize or 0) > 0)
+            and abs(o.strike - spot_price) / spot_price <= MAX_STRIKE_DEVIATION
         ]
 
         expiry_set = set(o.expiration for o in filtered)
