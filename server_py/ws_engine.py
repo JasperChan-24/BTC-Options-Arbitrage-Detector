@@ -309,35 +309,37 @@ class WsEngine:
     # ─── Spot price ───────────────────────────────────────────────────────
 
     async def _fetch_spot_loop(self) -> None:
-        self._http_client = httpx.AsyncClient(timeout=15)
+        self._http_client = httpx.AsyncClient(timeout=30)
         try:
             while not self._destroyed:
+                fetched = False
+                # Try Deribit first (reliable on cloud servers where OKX is blocked)
                 try:
-                    # Try OKX first
                     res = await self._http_client.get(
-                        "https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT"
+                        "https://www.deribit.com/api/v2/public/ticker?instrument_name=BTC-PERPETUAL"
                     )
-                    if res.status_code == 200:
-                        data = res.json()
-                        self._spot_price = float(
-                            data.get("data", [{}])[0].get("last", "0") or "0"
-                        )
-                    else:
-                        raise Exception(f"OKX returned {res.status_code}")
-                except Exception:
-                    # Fallback to Deribit (works on cloud servers where OKX is blocked)
+                    data = res.json()
+                    price = data.get("result", {}).get("last_price", 0)
+                    if price and price > 0:
+                        self._spot_price = price
+                        fetched = True
+                except Exception as e:
+                    print(f"[WS-ENGINE] Deribit spot failed: {type(e).__name__}: {e}")
+                # Fallback to OKX if Deribit failed
+                if not fetched:
                     try:
                         res = await self._http_client.get(
-                            "https://www.deribit.com/api/v2/public/ticker?instrument_name=BTC-PERPETUAL"
+                            "https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT"
                         )
-                        data = res.json()
-                        price = data.get("result", {}).get("last_price", 0)
-                        if price and price > 0:
-                            self._spot_price = price
+                        if res.status_code == 200:
+                            data = res.json()
+                            self._spot_price = float(
+                                data.get("data", [{}])[0].get("last", "0") or "0"
+                            )
                         else:
-                            print("[WS-ENGINE] Failed to fetch spot price from both sources")
-                    except Exception:
-                        print("[WS-ENGINE] Failed to fetch spot price, will retry")
+                            print(f"[WS-ENGINE] OKX spot returned {res.status_code}")
+                    except Exception as e:
+                        print(f"[WS-ENGINE] Spot price fetch failed: {type(e).__name__}: {e}")
                 await asyncio.sleep(10)
         finally:
             await self._http_client.aclose()

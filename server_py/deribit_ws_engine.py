@@ -330,7 +330,7 @@ class DeribitWsEngine:
     # ─── Spot price ───────────────────────────────────────────────────────
 
     async def _fetch_spot_loop(self) -> None:
-        self._http_client = httpx.AsyncClient(timeout=10)
+        self._http_client = httpx.AsyncClient(timeout=30)
         try:
             while not self._destroyed:
                 try:
@@ -344,8 +344,8 @@ class DeribitWsEngine:
                     )
                     data = res.json()
                     self._spot_price = data.get("result", {}).get("last_price", 0) or 0
-                except Exception:
-                    print("[DERIBIT-WS] Failed to fetch spot price, will retry")
+                except Exception as e:
+                    print(f"[DERIBIT-WS] Spot price failed: {type(e).__name__}: {e}")
                 await asyncio.sleep(10)
         finally:
             await self._http_client.aclose()
