@@ -580,6 +580,7 @@ class ArbitrageEngine:
 
             # Persist and broadcast
             self._store.add(execution)
+            self.start_global_order_polling()  # Wake up the polling loop if it was stopped!
             self._sse.broadcast("execution", execution.model_dump())
             self._sse.broadcast(
                 "execution_status",
